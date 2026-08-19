@@ -15,6 +15,8 @@ Every card presents the information needed for a manual healing decision without
 
 The card-level **Remedy** button is separate from direct healing clicks. It does not run when you left-click a party frame. One deliberate Remedy click applies one configured remedy to that card’s member, using the highest-priority recognized active status.
 
+Alliance 2 and Alliance 3 cards support the same direct healing bindings as local-party cards. Their HP/MP cards appear when enabled, but the Remedy button remains local-party-only because the documented Ashita status-icon interface does not expose equivalent per-member alliance status records.
+
 > If a member has Paralyze, Slow, and Blind simultaneously, the card initially displays `Remedy: Paralyna`. After Paralyze is cleared, the next deliberate Remedy click can select Erase for Slow.
 
 ## Visual Controls
@@ -32,6 +34,7 @@ Open `/partycare config` and use the **General** tab to customize the grid.
 | **Show MP Bar** | Shows or hides MP within every card. |
 | **Show Status Text** | Shows or hides the status label in the card header. |
 | **Show Remedy Button** | Shows or hides the card-level remedy control. |
+| **Show Alliance 2 / 3** | Adds that alliance party as a labeled grid section only when enabled and active members are present. |
 | **Show Legacy Spell Bar** | Restores the old Cure/Regen/Refresh action row beneath the grid. It is off by default. |
 
 ## Direct Clicks and Spell Bar

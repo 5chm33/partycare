@@ -24,7 +24,10 @@ function Party.normalize_member(raw, position)
 
     local party_slot = raw.party_slot;
     if party_slot == nil then party_slot = position - 1; end
-    if not Util.is_integer(party_slot) or party_slot < 0 or party_slot > 5 then return nil, 'party_slot must be an integer from 0 to 5'; end
+    if not Util.is_integer(party_slot) or party_slot < 0 or party_slot > 17 then return nil, 'party_slot must be an integer from 0 to 17'; end
+    local alliance_group = raw.alliance_group;
+    if alliance_group == nil then alliance_group = math.floor(party_slot / 6) + 1; end
+    if not Util.is_integer(alliance_group) or alliance_group < 1 or alliance_group > 3 then return nil, 'alliance_group must be an integer from 1 to 3'; end
 
     local debuffs = {};
     if raw.debuffs ~= nil then
@@ -40,6 +43,7 @@ function Party.normalize_member(raw, position)
         name = raw.name,
         position = position,
         party_slot = party_slot,
+        alliance_group = alliance_group,
         hp = Util.clamp(raw.hp, 0, raw.hp_max),
         hp_max = raw.hp_max,
         mp = mp_max == 0 and 0 or Util.clamp(mp, 0, mp_max),

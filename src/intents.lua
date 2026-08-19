@@ -41,6 +41,7 @@ function Intents.request(state, action_key, action, member, now, review_enabled)
         member_id = member.id,
         member_name = member.name,
         party_slot = member.party_slot,
+        alliance_group = member.alliance_group,
         review_click_cast_enabled = review_enabled == true,
     };
     table.insert(state.audit, Util.copy(intent));

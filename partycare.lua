@@ -1,7 +1,7 @@
 addon.name = 'partycare';
-addon.author = 'PartyCare';
-addon.version = '1.0.0';
-addon.desc = 'Manual party healing and remedy panel for Ashita.';
+addon.author = 'Schmeee';
+addon.version = '1.2.0';
+addon.desc = 'Manual party and alliance healing and remedy panel for Ashita.';
 
 local Config = require('src.config');
 local PanelModel = require('src.panel_model');

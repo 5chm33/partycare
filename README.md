@@ -1,5 +1,9 @@
 # PartyCare
 
+> **By: Schmeee**
+
+![PartyCare interface preview](assets/partycare-preview.png)
+
 PartyCare is a compact Ashita party-healing panel for HorizonXI. It displays party members as transparent grid cards with HP/MP bars, recognized status effects, configurable direct-click bindings, and per-member remedy controls.
 
 ## Install
@@ -28,12 +32,20 @@ The compact Settings window has four tabs.
 
 | Tab | Purpose |
 |---|---|
-| **General** | Position, transparent grid columns/card size, adaptive text scaling, display options, and health thresholds. |
+| **General** | Position, transparent grid columns/card size, adaptive text scaling, Alliance 2/3 visibility, display options, and health thresholds. |
 | **Direct Click** | Left, right, and middle party-frame bindings. |
 | **Spells** | Manual action-bar bindings for Cure, Regen, emergency healing, and optional Refresh. |
 | **Remedies** | Spell, enable state, and priority for each removable status. |
 
 Use **Save** to persist changes, **Save & Close** to persist and close, or **Close** to dismiss the window.
+
+## Alliance Grid
+
+PartyCare always displays your local party. In **General**, enable **Show Alliance 2** and/or **Show Alliance 3** to add those parties when they contain active members. Empty or disabled alliance parties add no blank cards or empty sections.
+
+Direct clicks retain each member’s actual alliance slot. Local party members use party targets; Alliance 2 and Alliance 3 members use the corresponding in-game alliance target ranges.[1]
+
+Alliance member HP/MP data is available through Ashita’s party interface. PartyCare intentionally does not infer removable status effects for Alliance 2/3 because Ashita’s documented status-icon records are limited to the local-party view.[2]
 
 ## Grid Cards and Remedies
 
@@ -80,3 +92,8 @@ If several recognized statuses are active, one Remedy click resolves only the to
 | `/partycare dispatch off` | Immediately disable PartyCare actions. |
 | `/partycare dispatch on` | Re-enable PartyCare actions. |
 | `/partycare status` | Print panel and action status. |
+
+## References
+
+[1]: https://horizonffxi.wiki/Macro "HorizonXI Macro Target Placeholders"
+[2]: https://github.com/AshitaXI/sdktest/blob/main/SDK/Memory/IParty.lua "Ashita IParty SDK Test"

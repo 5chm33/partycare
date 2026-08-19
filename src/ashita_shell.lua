@@ -190,6 +190,8 @@ local function render_general_tab(imgui, model, config)
     if toggle_button(imgui, 'Show MP Bar', config.ui.show_mp, function(value) mutate(model, function(candidate) candidate.ui.show_mp = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Status Text', config.ui.show_status, function(value) mutate(model, function(candidate) candidate.ui.show_status = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Remedy Button', config.ui.show_remedy_button, function(value) mutate(model, function(candidate) candidate.ui.show_remedy_button = value; end); end) then changed = true; end
+    if toggle_button(imgui, 'Show Alliance 2', config.ui.show_alliance_2, function(value) mutate(model, function(candidate) candidate.ui.show_alliance_2 = value; end); end) then changed = true; end
+    if toggle_button(imgui, 'Show Alliance 3', config.ui.show_alliance_3, function(value) mutate(model, function(candidate) candidate.ui.show_alliance_3 = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Legacy Spell Bar', config.ui.show_action_bar, function(value) mutate(model, function(candidate) candidate.ui.show_action_bar = value; end); end) then changed = true; end
     imgui.Separator();
     if stepper(imgui, 'Grid Columns', config.ui.grid_columns, 1, 3, 1, function(value) mutate(model, function(candidate) candidate.ui.grid_columns = value; end); window_initialized.main = false; end) then changed = true; end
@@ -263,7 +265,7 @@ local function render_settings_window(imgui, model, callbacks)
     if not config.ui.settings_open then return false; end
 
     initialize_window(imgui, 'settings', config.ui.settings_x, config.ui.settings_y, 430, 0);
-    local open = imgui.Begin('PartyCare Settings##grid');
+    local open = imgui.Begin('PartyCare Settings — By: Schmeee##grid');
     if open then
         changed = capture_position(model, 'capture_settings_position', imgui) or changed;
         view = model:view(); config = view.config;
@@ -291,6 +293,21 @@ end
 
 local function grid_window_width(config)
     return config.ui.grid_columns * config.ui.card_width + (config.ui.grid_columns - 1) * 8 + 20;
+end
+
+local function visible_member_groups(members, config)
+    local groups = {{id = 1, label = 'Party', members = {}}};
+    if config.ui.show_alliance_2 then table.insert(groups, {id = 2, label = 'Alliance 2', members = {}}); end
+    if config.ui.show_alliance_3 then table.insert(groups, {id = 3, label = 'Alliance 3', members = {}}); end
+    local lookup = {};
+    for _, group in ipairs(groups) do lookup[group.id] = group; end
+    for _, member in ipairs(members) do
+        local group = lookup[member.alliance_group or 1];
+        if group then table.insert(group.members, member); end
+    end
+    local visible = {};
+    for _, group in ipairs(groups) do if #group.members > 0 then table.insert(visible, group); end end
+    return visible;
 end
 
 local function render_member_card(imgui, model, member, now, config)
@@ -356,10 +373,18 @@ function AshitaShell.render(model, now, callbacks)
             imgui.Separator();
         end
 
-        for index, member in ipairs(view.members) do
-            render_member_card(imgui, model, member, now, config);
-            if index % config.ui.grid_columns ~= 0 and index < #view.members then imgui.SameLine(); end
+        local groups = visible_member_groups(view.members, config);
+        for group_index, group in ipairs(groups) do
+            if #groups > 1 then
+                if group_index > 1 then imgui.Separator(); end
+                imgui.TextDisabled(group.label);
+            end
+            for index, member in ipairs(group.members) do
+                render_member_card(imgui, model, member, now, config);
+                if index % config.ui.grid_columns ~= 0 and index < #group.members then imgui.SameLine(); end
+            end
         end
+        if not config.ui.minimal_mode then imgui.TextDisabled('By: Schmeee'); end
 
         if config.ui.show_action_bar then
             imgui.Separator();

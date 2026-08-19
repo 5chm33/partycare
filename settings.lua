@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 11,
+    version = 12,
     ui = {
         visible = true,
         locked = false,
@@ -26,6 +26,8 @@ return {
         show_status = true,
         show_action_bar = false,
         show_remedy_button = true,
+        show_alliance_2 = false,
+        show_alliance_3 = false,
     },
     thresholds = {warning_hp = 55, critical_hp = 30},
     actions = {

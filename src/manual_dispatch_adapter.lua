@@ -11,11 +11,21 @@ function Adapter.new(chat_manager)
     return setmetatable({chat_manager = chat_manager, audit = {}}, Adapter);
 end
 
+local function target_token(intent)
+    if not Util.is_integer(intent.party_slot) or intent.party_slot < 0 or intent.party_slot > 17 then
+        return nil, 'party slot must be an integer from 0 to 17';
+    end
+    if intent.party_slot <= 5 then return string.format('<p%d>', intent.party_slot), nil; end
+    if intent.party_slot <= 11 then return string.format('<a1%d>', intent.party_slot - 6), nil; end
+    return string.format('<a2%d>', intent.party_slot - 12), nil;
+end
+
 function Adapter.build_command(intent)
     if type(intent) ~= 'table' or intent.kind ~= 'MANUAL_CLICK_CAST_REQUEST' then return nil, 'unsupported intent'; end
     if not safe_spell(intent.spell) then return nil, 'spell contains unsupported characters'; end
-    if not Util.is_integer(intent.party_slot) or intent.party_slot < 0 or intent.party_slot > 5 then return nil, 'party slot must be an integer from 0 to 5'; end
-    return string.format('/ma "%s" <p%d>', intent.spell, intent.party_slot), nil;
+    local target, target_error = target_token(intent);
+    if not target then return nil, target_error; end
+    return string.format('/ma "%s" %s', intent.spell, target), nil;
 end
 
 function Adapter:dispatch(intent, live_test)
@@ -29,7 +39,7 @@ function Adapter:dispatch(intent, live_test)
     local command, command_error = Adapter.build_command(intent);
     if not command then return false, command_error; end
     self.chat_manager:QueueCommand(1, command);
-    table.insert(self.audit, {sequence = intent.sequence, command = command, member_name = intent.member_name, spell = intent.spell});
+    table.insert(self.audit, {sequence = intent.sequence, command = command, member_name = intent.member_name, spell = intent.spell, alliance_group = intent.alliance_group});
     return true, command;
 end
 
