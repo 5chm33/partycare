@@ -1,0 +1,6 @@
+.partycare_settings.lua
+.partycare_settings.lua.tmp
+.partycare_settings.lua.bak
+*.zip
+*.sha256
+tests/debug_*.lua
