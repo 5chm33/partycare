@@ -9,8 +9,8 @@ Every card presents the information needed for a manual healing decision without
 | Element | Meaning |
 |---|---|
 | **Name header** | The party member’s name and current status text. A direct-click binding acts on this frame. |
-| **HP bar** | Current and maximum HP with percentage. |
-| **MP bar** | Current and maximum MP; hide it from the General tab when it is not needed. |
+| **HP bar** | Current and maximum HP with percentage. HP is green above the warning threshold, yellow between warning and critical, and red at critical levels. |
+| **MP bar** | Current and maximum MP; hide it from the General tab when it is not needed. MP is blue at high values, shifts through teal/yellow as it falls, and becomes red when critical. |
 | **Remedy button** | Appears only for a member with a recognized, enabled removable status. It names the spell currently selected by the priority rules. |
 
 The card-level **Remedy** button is separate from direct healing clicks. It does not run when you left-click a party frame. One deliberate Remedy click applies one configured remedy to that card’s member, using the highest-priority recognized active status.
@@ -26,7 +26,7 @@ Open `/partycare config` and use the **General** tab to customize the grid.
 | **Grid Columns** | One, two, or three cards per row. |
 | **Card Width** | Width of each party frame. |
 | **Card Height** | Space reserved for each party frame. |
-| **Adaptive Card Scaling** | Updates card width, height, and text scale as you resize the panel. Turn it off to use a manual Text Scale. |
+| **Adaptive Card Scaling** | Updates card width, height, and text scale as you resize the panel. At small scales, bar labels collapse to a clear `HP 72%` / `MP 48%` format rather than clipping. Turn it off to use a manual Text Scale. |
 | **Minimal Live Frame** | Hides PartyCare’s in-panel title and Settings control during play. |
 | **Transparency** | Panel background opacity, from subtle to nearly opaque. |
 | **Show MP Bar** | Shows or hides MP within every card. |

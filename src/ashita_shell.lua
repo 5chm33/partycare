@@ -1,4 +1,5 @@
 local AshitaShell = {};
+local ResourceStyle = require('src.resource_style');
 
 local required_imgui = nil;
 local required_imgui_error = nil;
@@ -94,6 +95,17 @@ end
 
 local function dummy(imgui, width, height)
     if type(imgui.Dummy) == 'function' then imgui.Dummy({width, height}); else imgui.Text(' '); end
+end
+
+local function styled_progress(imgui, fraction, size, label, color)
+    local pushed = false;
+    local plot_color = rawget(_G, 'ImGuiCol_PlotHistogram');
+    if plot_color and type(imgui.PushStyleColor) == 'function' and type(imgui.PopStyleColor) == 'function' then
+        imgui.PushStyleColor(plot_color, color);
+        pushed = true;
+    end
+    imgui.ProgressBar(fraction, size, label);
+    if pushed then imgui.PopStyleColor(1); end
 end
 
 local function begin_group(imgui)
@@ -287,9 +299,11 @@ local function render_member_card(imgui, model, member, now, config)
     local clicked = member_click(imgui, model, member, now, card_width, config.ui.member_height);
     local latest = model:view();
     if clicked then latest = model:view(); end
-    imgui.ProgressBar(member.hp_percent / 100, {card_width, 10}, 'HP ' .. percent_text(member.hp, member.hp_max));
+    local hp_color = ResourceStyle.hp_color(member.hp_percent / 100, config.thresholds.warning_hp, config.thresholds.critical_hp);
+    styled_progress(imgui, member.hp_percent / 100, {card_width, 10}, ResourceStyle.bar_label('HP', member.hp, member.hp_max, config.ui.font_scale), hp_color);
     if config.ui.show_mp and member.mp_max > 0 then
-        imgui.ProgressBar(member.mp_percent / 100, {card_width, 8}, 'MP ' .. percent_text(member.mp, member.mp_max));
+        local mp_color = ResourceStyle.mp_color(member.mp_percent / 100);
+        styled_progress(imgui, member.mp_percent / 100, {card_width, 8}, ResourceStyle.bar_label('MP', member.mp, member.mp_max, config.ui.font_scale), mp_color);
     end
     local recommendation = member.remedy_recommendation;
     if config.ui.show_remedy_button and recommendation then
