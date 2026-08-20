@@ -244,16 +244,27 @@ local function render_spells_tab(imgui, model, config)
     return changed;
 end
 
+local REMEDY_GROUPS = {
+    {title = 'Dedicated removal spells', keys = {'paralyze', 'doom', 'petrify', 'curse', 'plague', 'disease', 'silence', 'blind', 'poison'}},
+    {title = 'Erase effects', keys = {'gravity', 'bind', 'slow', 'bio', 'dia', 'addle', 'flash', 'stun', 'elegy', 'requiem', 'helix'}},
+    {title = 'Low-priority Erase groups', keys = {'elemental_dot', 'stat_down'}},
+};
+
 local function render_remedies_tab(imgui, model, config)
     local changed = false;
     imgui.Text('Debuff Remedy Rules');
-    imgui.TextDisabled('Each Remedy click resolves one highest-priority recognized active debuff.');
-    for _, rule_key in ipairs({'paralyze', 'gravity', 'slow', 'silence', 'blind', 'poison', 'bio', 'dia'}) do
-        local rule = config.remedies[rule_key];
-        imgui.Separator(); imgui.Text(rule_key:upper() .. ' — priority ' .. tostring(rule.priority));
-        if edit_text(imgui, 'remedy_spell_' .. rule_key, 'Spell##remedy_' .. rule_key, rule.spell, function(value) mutate(model, function(candidate) candidate.remedies[rule_key].spell = value; end); end) then changed = true; end
-        if toggle_button(imgui, 'Enable ' .. rule_key, rule.enabled, function(value) mutate(model, function(candidate) candidate.remedies[rule_key].enabled = value; end); end) then changed = true; end
-        if stepper(imgui, 'Priority ' .. rule_key, rule.priority, 0, 200, 5, function(value) mutate(model, function(candidate) candidate.remedies[rule_key].priority = value; end); end) then changed = true; end
+    imgui.TextDisabled('Each Remedy click resolves one highest-priority recognized active debuff. Elemental dots and stat-down effects share their own Erase rules.');
+    for _, group in ipairs(REMEDY_GROUPS) do
+        imgui.Separator(); imgui.Text(group.title);
+        for _, rule_key in ipairs(group.keys) do
+            local rule = config.remedies[rule_key];
+            if rule then
+                imgui.Text(rule_key:upper() .. ' — priority ' .. tostring(rule.priority));
+                if edit_text(imgui, 'remedy_spell_' .. rule_key, 'Spell##remedy_' .. rule_key, rule.spell, function(value) mutate(model, function(candidate) candidate.remedies[rule_key].spell = value; end); end) then changed = true; end
+                if toggle_button(imgui, 'Enable ' .. rule_key, rule.enabled, function(value) mutate(model, function(candidate) candidate.remedies[rule_key].enabled = value; end); end) then changed = true; end
+                if stepper(imgui, 'Priority ' .. rule_key, rule.priority, 0, 200, 5, function(value) mutate(model, function(candidate) candidate.remedies[rule_key].priority = value; end); end) then changed = true; end
+            end
+        end
     end
     return changed;
 end
@@ -324,7 +335,7 @@ local function render_member_card(imgui, model, member, now, config)
     end
     local recommendation = member.remedy_recommendation;
     if config.ui.show_remedy_button and recommendation then
-        local remedy_label = 'Remedy: ' .. recommendation.spell .. '##remedy_' .. tostring(member.id);
+        local remedy_label = 'Remedy: ' .. recommendation.spell .. ' (' .. recommendation.debuff .. ')##remedy_' .. tostring(member.id);
         if imgui.Button(remedy_label, {card_width, 16}) then
             model:select_member(member.id);
             model:request_remedy(now);
@@ -332,6 +343,8 @@ local function render_member_card(imgui, model, member, now, config)
         if type(imgui.IsItemHovered) == 'function' and imgui.IsItemHovered() and type(imgui.SetTooltip) == 'function' then
             imgui.SetTooltip('Priority ' .. tostring(recommendation.priority) .. ': ' .. recommendation.debuff .. ' → ' .. recommendation.spell);
         end
+    elseif config.ui.show_status and type(member.detected_remedies) == 'table' and #member.detected_remedies > 0 then
+        imgui.TextDisabled('Detected: ' .. table.concat(member.detected_remedies, ', '));
     elseif config.ui.show_status and member.status ~= '' then
         imgui.TextDisabled(member.status);
     else

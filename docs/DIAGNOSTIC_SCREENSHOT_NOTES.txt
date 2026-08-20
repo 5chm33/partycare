@@ -1,0 +1,15 @@
+Screenshot verification
+
+Source: /home/ubuntu/upload/pasted_file_SbLOOa_image.png
+Dimensions: 528 x 105 pixels; aspect ratio 176:35.
+Tile order: one horizontal tile; no overlap required.
+
+Verified text:
+[10:58:12] [Addons] Loaded addon: partycare
+version: 1.1.0-experimental - by: Manual healer-panel
+architecture
+[10:58:12] [PartyCare] Panel unavailable: Ashita
+ImGui bindings are unavailable. Try /partycare show or
+/partycare config.
+
+Finding: the addon loaded; its presentation layer did not load the Ashita ImGui module. A maintained Ashita v4 UI reference imports ImGui explicitly with require('imgui'), rather than relying on a global imgui table.

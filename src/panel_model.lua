@@ -13,6 +13,7 @@ local function decorate_members(members, config)
         local recommendation, candidates = Remedies.recommend(member, config.remedies);
         member.remedy_recommendation = recommendation;
         member.remedy_candidates = candidates;
+        member.detected_remedies = Remedies.normalize_list(member);
     end
     return decorated;
 end

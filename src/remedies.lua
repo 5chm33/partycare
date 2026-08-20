@@ -4,10 +4,21 @@ local Remedies = {};
 
 local ALIASES = {
     paralyze = 'paralyze', paralysis = 'paralyze',
-    gravity = 'gravity', slow = 'slow',
-    silence = 'silence',
-    blind = 'blind', blindness = 'blind',
-    poison = 'poison', bio = 'bio', dia = 'dia',
+    doom = 'doom', petrify = 'petrify', petrification = 'petrify',
+    curse = 'curse', plague = 'plague', disease = 'disease',
+    gravity = 'gravity', weight = 'gravity', bind = 'bind', slow = 'slow',
+    silence = 'silence', blind = 'blind', blindness = 'blind', poison = 'poison',
+    bio = 'bio', dia = 'dia', addle = 'addle', flash = 'flash', stun = 'stun',
+    elegy = 'elegy', requiem = 'requiem', helix = 'helix',
+    burn = 'elemental_dot', frost = 'elemental_dot', choke = 'elemental_dot',
+    rasp = 'elemental_dot', shock = 'elemental_dot', drown = 'elemental_dot',
+    elemental_dot = 'elemental_dot',
+    str_down = 'stat_down', dex_down = 'stat_down', vit_down = 'stat_down',
+    agi_down = 'stat_down', int_down = 'stat_down', mnd_down = 'stat_down', chr_down = 'stat_down',
+    max_hp_down = 'stat_down', max_mp_down = 'stat_down', accuracy_down = 'stat_down',
+    attack_down = 'stat_down', evasion_down = 'stat_down', defense_down = 'stat_down',
+    magic_def_down = 'stat_down', magic_acc_down = 'stat_down', magic_atk_down = 'stat_down',
+    max_tp_down = 'stat_down', stat_down = 'stat_down',
 };
 
 local function canonical(value)

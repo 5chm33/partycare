@@ -63,21 +63,19 @@ The **Spells** tab includes an optional Refresh binding for Red Mage play. Enabl
 
 ## Remedies
 
-PartyCare reads recognized party status icons and maps them into configurable remedy rules. Select a member with a recognized status, then click **Remedy**. PartyCare evaluates all recognized active rules and uses the single highest-priority enabled remedy.
+PartyCare associates local-party status records with member cards by server ID, and reads the local player’s documented buff list separately. This corrects the prior mismatch that could hide effects such as Poison or Bio/Dia on the wrong card. When a rule matches, the affected card shows a clear label such as **`Remedy: Erase (bio)`**.
 
-The default priority order is:
+Each Remedy click resolves **one** highest-priority enabled effect. It does not attempt to chain casts. If several statuses are active, the next explicit click reevaluates the current status list after the prior spell resolves.
 
-| Priority | Status | Default spell |
+| Priority tier | Covered statuses | Default response |
 |---:|---|---|
-| 100 | Paralyze | Paralyna |
-| 90 | Gravity | Erase |
-| 85 | Slow | Erase |
-| 70 | Silence | Silena |
-| 60 | Blind | Blindna |
-| 50 | Poison | Poisona |
-| 45 | Bio / Dia | Erase |
+| 93–100 | Paralyze, Doom, Petrify, Curse, Plague, Disease | Paralyna, Cursna, Stona, Cursna, Viruna, Viruna |
+| 70–90 | Gravity/Weight, Bind, Slow, Silence, Blind | Erase, Erase, Erase, Silena, Blindna |
+| 38–50 | Poison, Bio, Dia, Addle, Flash, Stun, Elegy, Requiem, Helix | Poisona or Erase |
+| 10 | Burn, Frost, Choke, Rasp, Shock, Drown | Erase |
+| 5 | Common attribute, combat-stat, maximum-resource, and magic-stat down effects | Erase |
 
-If several recognized statuses are active, one Remedy click resolves only the top-priority rule. Reconfigure the order or disable individual rules in the **Remedies** tab.
+The full behavior remains configurable in the **Remedies** tab. PartyCare only shows status-derived Remedy controls for the local party because Ashita documents local-party status records only; Alliance 2/3 cards remain direct-healing cards.[2] Erase removes one detrimental magical effect, so the UI intentionally recommends one highest-priority Erase target at a time.[3]
 
 ## Commands
 
@@ -97,3 +95,4 @@ If several recognized statuses are active, one Remedy click resolves only the to
 
 [1]: https://horizonffxi.wiki/Macro "HorizonXI Macro Target Placeholders"
 [2]: https://github.com/AshitaXI/sdktest/blob/main/SDK/Memory/IParty.lua "Ashita IParty SDK Test"
+[3]: https://horizonffxi.wiki/Erase "HorizonXI Erase"

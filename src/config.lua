@@ -1,7 +1,7 @@
 local Util = require('src.util');
 
 local Config = {};
-Config.VERSION = 12;
+Config.VERSION = 13;
 
 Config.DEFAULT = {
     version = Config.VERSION,
@@ -24,13 +24,27 @@ Config.DEFAULT = {
     },
     remedies = {
         paralyze = {spell = 'Paralyna', enabled = true, priority = 100},
+        doom = {spell = 'Cursna', enabled = true, priority = 97},
+        petrify = {spell = 'Stona', enabled = true, priority = 96},
+        curse = {spell = 'Cursna', enabled = true, priority = 95},
+        plague = {spell = 'Viruna', enabled = true, priority = 94},
+        disease = {spell = 'Viruna', enabled = true, priority = 93},
         gravity = {spell = 'Erase', enabled = true, priority = 90},
+        bind = {spell = 'Erase', enabled = true, priority = 89},
         slow = {spell = 'Erase', enabled = true, priority = 85},
         silence = {spell = 'Silena', enabled = true, priority = 70},
         blind = {spell = 'Blindna', enabled = true, priority = 60},
         poison = {spell = 'Poisona', enabled = true, priority = 50},
         bio = {spell = 'Erase', enabled = true, priority = 45},
         dia = {spell = 'Erase', enabled = true, priority = 45},
+        addle = {spell = 'Erase', enabled = true, priority = 44},
+        flash = {spell = 'Erase', enabled = true, priority = 43},
+        stun = {spell = 'Erase', enabled = true, priority = 42},
+        elegy = {spell = 'Erase', enabled = true, priority = 40},
+        requiem = {spell = 'Erase', enabled = true, priority = 39},
+        helix = {spell = 'Erase', enabled = true, priority = 38},
+        elemental_dot = {spell = 'Erase', enabled = true, priority = 10},
+        stat_down = {spell = 'Erase', enabled = true, priority = 5},
     },
     review = {review_click_cast_enabled = false, approval_status = 'PENDING_HORIZONXI_REVIEW'},
     live_test = {manual_dispatch_enabled = true, emergency_stop = false},
@@ -114,6 +128,9 @@ local function migrate(raw)
         if previous_version < 12 then
             raw.ui.show_alliance_2 = false;
             raw.ui.show_alliance_3 = false;
+        end
+        if previous_version < 13 then
+            -- Newly introduced remedy rules are populated from Config.DEFAULT above.
         end
         for key, default_binding in pairs(Config.DEFAULT.direct_click) do
             if key ~= 'enabled' then raw.direct_click[key] = raw.direct_click[key] or Util.copy(default_binding); end

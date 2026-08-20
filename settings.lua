@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 12,
+    version = 13,
     ui = {
         visible = true,
         locked = false,
@@ -37,14 +37,31 @@ return {
         refresh = {label = 'Refresh', spell = 'Refresh', enabled = false},
     },
     remedies = {
+        -- Dedicated status-removal spells.
         paralyze = {spell = 'Paralyna', enabled = true, priority = 100},
-        gravity = {spell = 'Erase', enabled = true, priority = 90},
-        slow = {spell = 'Erase', enabled = true, priority = 85},
+        doom = {spell = 'Cursna', enabled = true, priority = 97},
+        petrify = {spell = 'Stona', enabled = true, priority = 96},
+        curse = {spell = 'Cursna', enabled = true, priority = 95},
+        plague = {spell = 'Viruna', enabled = true, priority = 94},
+        disease = {spell = 'Viruna', enabled = true, priority = 93},
         silence = {spell = 'Silena', enabled = true, priority = 70},
         blind = {spell = 'Blindna', enabled = true, priority = 60},
         poison = {spell = 'Poisona', enabled = true, priority = 50},
+
+        -- Erase removes one enabled matching effect per deliberate Remedy click.
+        gravity = {spell = 'Erase', enabled = true, priority = 90},
+        bind = {spell = 'Erase', enabled = true, priority = 89},
+        slow = {spell = 'Erase', enabled = true, priority = 85},
         bio = {spell = 'Erase', enabled = true, priority = 45},
         dia = {spell = 'Erase', enabled = true, priority = 45},
+        addle = {spell = 'Erase', enabled = true, priority = 44},
+        flash = {spell = 'Erase', enabled = true, priority = 43},
+        stun = {spell = 'Erase', enabled = true, priority = 42},
+        elegy = {spell = 'Erase', enabled = true, priority = 40},
+        requiem = {spell = 'Erase', enabled = true, priority = 39},
+        helix = {spell = 'Erase', enabled = true, priority = 38},
+        elemental_dot = {spell = 'Erase', enabled = true, priority = 10}, -- Burn, Frost, Choke, Rasp, Shock, Drown
+        stat_down = {spell = 'Erase', enabled = true, priority = 5},
     },
     review = {review_click_cast_enabled = false, approval_status = 'PENDING_HORIZONXI_REVIEW'},
     live_test = {manual_dispatch_enabled = true, emergency_stop = false},
