@@ -63,7 +63,7 @@ The **Spells** tab includes an optional Refresh binding for Red Mage play. Enabl
 
 ## Remedies
 
-PartyCare associates local-party status records with member cards by server ID, and reads the local player’s documented buff list separately. This corrects the prior mismatch that could hide effects such as Poison or Bio/Dia on the wrong card. When a rule matches, the affected card shows a clear label such as **`Remedy: Erase (bio)`**.
+PartyCare associates local-party status records with member cards by server ID and reads the local player’s documented status sources separately. Its decoder explicitly supports Ashita’s native indexed status arrays, including userdata-backed arrays exposed by the HorizonXI runtime. This corrects both the prior member-record mismatch and the plain-table-only decoding issue that could hide effects such as Poison, Bio/Dia, or Frost. When a rule matches, the affected card shows a clear label such as **`Remedy: Erase (bio)`**.
 
 Each Remedy click resolves **one** highest-priority enabled effect. It does not attempt to chain casts. If several statuses are active, the next explicit click reevaluates the current status list after the prior spell resolves.
 

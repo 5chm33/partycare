@@ -36,10 +36,14 @@ end
 
 local function decode_icons(icons)
     local found, debuffs, observed = {}, {}, 0;
-    if type(icons) ~= 'table' then return debuffs, observed, false; end
-    -- pairs intentionally supports bindings that expose zero-indexed status arrays.
-    for _, raw_id in pairs(icons) do
+    if icons == nil then return debuffs, observed, false; end
+    -- Ashita can expose the 32-status array as a userdata-backed indexed source, not a plain Lua table.
+    -- Read explicit one-based entries, matching maintained AshitaFrames behavior and the SDK's 32-entry contract.
+    for index = 1, 32 do
+        local ok, raw_id = pcall(function() return icons[index]; end);
+        if not ok then return debuffs, observed, false; end
         local status_id = tonumber(raw_id);
+        if status_id == 255 then break; end
         if status_id and status_id > 0 then
             observed = observed + 1;
             local rule_id = STATUS_TO_REMEDY_RULE[status_id];

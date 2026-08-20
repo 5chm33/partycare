@@ -8,7 +8,7 @@ PartyCare reads the local player from Ashita's player-status sources and associa
 |---|---|---|
 | `Remedy: <spell> (<effect>)` | PartyCare detected an enabled, supported removable effect. | Click the card-level Remedy button once. |
 | `Status icons detected — no enabled Remedy rule` | Ashita provided active status IDs, but none map to an enabled PartyCare rule. | Open **Remedies** and verify the matching rule remains enabled; report the specific status effect if it is absent. |
-| `Status feed unavailable` | The runtime did not expose a usable local status source for that card. | Reload PartyCare; if it persists, capture this card text and the active status name for diagnosis. |
+| `Status feed unavailable` | The runtime did not expose a usable local status source for that card. Current builds decode Ashita’s native userdata-backed indexed status arrays, so this message now indicates that no player-status source was returned at all. | Reload the current PartyCare build; if it persists, capture this card text and the active status name for diagnosis. |
 
 The current supported local status catalog includes Poison, Paralyze, Blind, Silence, Petrify, Disease, Curse, Doom, Plague, Bind, Gravity/Weight, Slow, Bio, Dia, Addle, Flash, Stun, Elegy, Requiem, Helix, six elemental damage-over-time effects, and common stat-down effects. Erase handles one detrimental magic effect at a time, so the panel intentionally exposes one highest-priority remedy per click.
 
