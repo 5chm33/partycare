@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 14,
+    version = 15,
     ui = {
         visible = true,
         locked = false,
@@ -71,6 +71,10 @@ return {
         left = {spell = 'Cure IV', enabled = true},
         right = {spell = 'Regen', enabled = false},
         middle = {spell = 'Cure V', enabled = false},
+        mouse4 = {spell = 'Cure III', enabled = false}, -- First mouse side button.
+        mouse5 = {spell = 'Cure V', enabled = false}, -- Second mouse side button.
+        wheel_up = {spell = 'Regen', enabled = false}, -- Scroll upward while hovering a card.
+        wheel_down = {spell = 'Cure III', enabled = false}, -- Scroll downward while hovering a card.
     },
     colors = {
         healthy = {0.15, 0.70, 0.35, 1.00},

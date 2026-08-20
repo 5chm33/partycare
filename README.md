@@ -28,13 +28,12 @@ or the short alias:
 
 ## Settings
 
-The compact Settings window has four tabs.
+The compact Settings window has three focused tabs.
 
 | Tab | Purpose |
 |---|---|
 | **General** | Position, transparent grid columns/card size, adaptive text scaling, Alliance 2/3 visibility, display options, a safe Full Alliance layout preview, and health thresholds. |
-| **Direct Click** | Left, right, and middle party-frame bindings. |
-| **Spells** | Manual action-bar bindings for Cure, Regen, emergency healing, and optional Refresh. |
+| **Direct Click** | Spell bindings for left, right, middle, Mouse 4, Mouse 5, and hover-wheel inputs. |
 | **Remedies** | Spell, enable state, and priority for each removable status. |
 
 Use **Save** to persist changes, **Save & Close** to persist and close, or **Close** to dismiss the window.
@@ -53,13 +52,9 @@ Each party member appears as a compact card with name, unclipped HP/MP percentag
 
 ## Direct Clicks
 
-When Direct Click Mode is enabled, clicking an active party frame uses that mouse button’s configured spell. The default left-click binding is Cure IV; edit any spell name or button binding in **Direct Click**.
+When Direct Click Mode is enabled, each active party-card input uses its configured spell. The default left-click binding is Cure IV; edit any spell name or input binding in **Direct Click**. Alongside left, right, and middle click, PartyCare supports **Mouse 4**, **Mouse 5**, **Wheel Up**, and **Wheel Down** when the Ashita ImGui runtime exposes that input. Wheel bindings require the cursor to be directly over the intended card and are limited to one manual action per deliberate scroll input.
 
-Direct Click Mode can be turned off at any time. With it off, party-frame clicks only select a member.
-
-## Refresh
-
-The **Spells** tab includes an optional Refresh binding for Red Mage play. Enable it to show Refresh in the manual action bar, then select a party member and click the action.
+Direct Click Mode can be turned off at any time. With it off, card inputs only select a member. Assign a RDM spell such as Refresh or Haste to any enabled direct binding; no separate action bar is needed.
 
 ## Remedies
 

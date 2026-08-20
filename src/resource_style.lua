@@ -39,4 +39,9 @@ function ResourceStyle.bar_label(prefix, current, maximum)
     return string.format('%s %d%%', prefix, percent);
 end
 
+function ResourceStyle.bar_height(base_height, font_scale)
+    local scale = math.max(0.85, tonumber(font_scale) or 1);
+    return math.max(base_height, math.floor(base_height * scale + 0.5));
+end
+
 return ResourceStyle;

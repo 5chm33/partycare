@@ -161,7 +161,17 @@ function AshitaShell.reset_window_positions()
     settings_feedback = nil;
 end
 
-local MOUSE_BUTTONS = {left = 0, right = 1, middle = 2};
+local MOUSE_BUTTONS = {left = 0, right = 1, middle = 2, mouse4 = 3, mouse5 = 4};
+local last_wheel_dispatch_at = -1;
+
+local function hovered_wheel_direction(imgui)
+    if type(imgui.IsItemHovered) ~= 'function' or not imgui.IsItemHovered() or type(imgui.GetIO) ~= 'function' then return nil; end
+    local ok, io = pcall(function() return imgui.GetIO(); end);
+    local wheel = ok and io ~= nil and tonumber(io.MouseWheel or io.mouse_wheel) or nil;
+    if wheel and wheel > 0 then return 'wheel_up'; end
+    if wheel and wheel < 0 then return 'wheel_down'; end
+    return nil;
+end
 
 local function member_click(imgui, model, member, now, width, height)
     local pressed = imgui.Button(member_label(member, tostring(model:view().selected_member_id) == tostring(member.id)) .. '##member_' .. tostring(member.id), {width, height});
@@ -169,9 +179,15 @@ local function member_click(imgui, model, member, now, width, height)
     if member.layout_preview then return false; end
     local button = nil;
     if type(imgui.IsItemClicked) == 'function' then
-        for name, code in pairs(MOUSE_BUTTONS) do if imgui.IsItemClicked(code) then button = name; break; end end
-    elseif pressed then
-        button = 'left';
+        for _, name in ipairs({'left', 'right', 'middle', 'mouse4', 'mouse5'}) do
+            if imgui.IsItemClicked(MOUSE_BUTTONS[name]) then button = name; break; end
+        end
+    end
+    -- Some Ashita ImGui builds expose IsItemClicked but do not report Button's left-click activation through it.
+    if not button and pressed then button = 'left'; end
+    if not button then
+        local wheel = hovered_wheel_direction(imgui);
+        if wheel and now - last_wheel_dispatch_at >= 0.10 then button, last_wheel_dispatch_at = wheel, now; end
     end
     if not button then return false; end
     local intent = model:request_direct_click(member.id, button, now);
@@ -210,7 +226,6 @@ local function render_general_tab(imgui, model, config)
     if toggle_button(imgui, 'Show Alliance 3', config.ui.show_alliance_3, function(value) mutate(model, function(candidate) candidate.ui.show_alliance_3 = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Full Alliance Layout Preview', config.ui.full_alliance_preview, function(value) mutate(model, function(candidate) candidate.ui.full_alliance_preview = value; end); end) then changed = true; end
     if config.ui.full_alliance_preview then imgui.TextDisabled('Preview cards are display-only and cannot select targets or cast spells.'); end
-    if toggle_button(imgui, 'Show Legacy Spell Bar', config.ui.show_action_bar, function(value) mutate(model, function(candidate) candidate.ui.show_action_bar = value; end); end) then changed = true; end
     imgui.Separator();
     if stepper(imgui, 'Grid Columns', config.ui.grid_columns, 1, 3, 1, function(value) mutate(model, function(candidate) candidate.ui.grid_columns = value; end); window_initialized.main = false; end) then changed = true; end
     if stepper(imgui, 'Card Width', config.ui.card_width, 140, 360, 10, function(value) mutate(model, function(candidate) candidate.ui.card_width = value; end); window_initialized.main = false; end) then changed = true; end
@@ -227,38 +242,31 @@ local function render_general_tab(imgui, model, config)
     return changed;
 end
 
+local DIRECT_BINDINGS = {
+    {key = 'left', label = 'Left Click'}, {key = 'right', label = 'Right Click'}, {key = 'middle', label = 'Middle Click'},
+    {key = 'mouse4', label = 'Mouse 4 (side)'}, {key = 'mouse5', label = 'Mouse 5 (side)'},
+    {key = 'wheel_up', label = 'Wheel Up (hover)'}, {key = 'wheel_down', label = 'Wheel Down (hover)'},
+};
+
 local function render_direct_tab(imgui, model, config)
     local changed = false;
     local armed = config.direct_click.enabled and config.live_test.manual_dispatch_enabled and not config.live_test.emergency_stop;
-    imgui.Text('Direct Party-Frame Clicks');
-    imgui.TextDisabled(armed and 'ACTIVE: one deliberate frame click uses its configured binding.' or 'INACTIVE: frame clicks select members only.');
-    if toggle_button(imgui, 'Enable Direct Click Mode', config.direct_click.enabled, function(value)
+    imgui.Text('Direct Party-Frame Bindings');
+    imgui.TextDisabled(armed and 'ACTIVE: each deliberate card input uses its configured spell.' or 'INACTIVE: card inputs select members only.');
+    if toggle_button(imgui, 'Enable Direct Bindings', config.direct_click.enabled, function(value)
         mutate(model, function(candidate)
             candidate.direct_click.enabled = value;
             candidate.live_test.manual_dispatch_enabled = value;
             candidate.live_test.emergency_stop = not value;
         end);
     end) then changed = true; end
-    for _, button in ipairs({'left', 'right', 'middle'}) do
-        local binding = config.direct_click[button];
-        imgui.Separator(); imgui.Text(button:upper() .. ' CLICK');
-        if edit_text(imgui, 'direct_spell_' .. button, 'Spell##direct_' .. button, binding.spell, function(value) mutate(model, function(candidate) candidate.direct_click[button].spell = value; end); end) then changed = true; end
-        if toggle_button(imgui, 'Enable ' .. button, binding.enabled, function(value) mutate(model, function(candidate) candidate.direct_click[button].enabled = value; end); end) then changed = true; end
+    for _, item in ipairs(DIRECT_BINDINGS) do
+        local binding = config.direct_click[item.key];
+        imgui.Separator(); imgui.Text(item.label);
+        if edit_text(imgui, 'direct_spell_' .. item.key, 'Spell##direct_' .. item.key, binding.spell, function(value) mutate(model, function(candidate) candidate.direct_click[item.key].spell = value; end); end) then changed = true; end
+        if toggle_button(imgui, 'Enable ' .. item.label, binding.enabled, function(value) mutate(model, function(candidate) candidate.direct_click[item.key].enabled = value; end); end) then changed = true; end
     end
-    return changed;
-end
-
-local function render_spells_tab(imgui, model, config)
-    local changed = false;
-    imgui.Text('Optional Spell Bar');
-    imgui.TextDisabled('Enable the legacy spell bar only if you want extra manual action buttons below the grid.');
-    for _, action_key in ipairs({'primary', 'secondary', 'emergency', 'refresh'}) do
-        local action = config.actions[action_key];
-        imgui.Separator(); imgui.Text(action_key:upper());
-        if edit_text(imgui, 'action_label_' .. action_key, 'Label##' .. action_key, action.label, function(value) mutate(model, function(candidate) candidate.actions[action_key].label = value; end); end) then changed = true; end
-        if edit_text(imgui, 'action_spell_' .. action_key, 'Spell##' .. action_key, action.spell, function(value) mutate(model, function(candidate) candidate.actions[action_key].spell = value; end); end) then changed = true; end
-        if toggle_button(imgui, 'Enable ' .. action_key, action.enabled, function(value) mutate(model, function(candidate) candidate.actions[action_key].enabled = value; end); end) then changed = true; end
-    end
+    imgui.TextDisabled('Wheel bindings require the cursor to be directly over a party card and are limited to one action per scroll input.');
     return changed;
 end
 
@@ -313,12 +321,10 @@ local function render_settings_window(imgui, model, callbacks)
         imgui.Separator();
         if tab_button(imgui, 'general', 'General') then changed = true; end
         imgui.SameLine(); if tab_button(imgui, 'direct', 'Direct Click') then changed = true; end
-        imgui.SameLine(); if tab_button(imgui, 'spells', 'Spells') then changed = true; end
         imgui.SameLine(); if tab_button(imgui, 'remedies', 'Remedies') then changed = true; end
         imgui.Separator();
         if settings_tab == 'general' then changed = render_general_tab(imgui, model, config) or changed;
         elseif settings_tab == 'direct' then changed = render_direct_tab(imgui, model, config) or changed;
-        elseif settings_tab == 'spells' then changed = render_spells_tab(imgui, model, config) or changed;
         elseif settings_tab == 'remedies' then changed = render_remedies_tab(imgui, model, config) or changed;
         end
     end
@@ -377,10 +383,12 @@ local function render_member_card(imgui, model, member, now, config)
     local latest = model:view();
     if clicked then latest = model:view(); end
     local hp_color = ResourceStyle.hp_color(member.hp_percent / 100, config.thresholds.warning_hp, config.thresholds.critical_hp);
-    styled_progress(imgui, member.hp_percent / 100, {card_width, 10}, ResourceStyle.bar_label('HP', member.hp, member.hp_max, config.ui.font_scale), hp_color);
+    local hp_bar_h = ResourceStyle.bar_height(12, config.ui.font_scale);
+    styled_progress(imgui, member.hp_percent / 100, {card_width, hp_bar_h}, ResourceStyle.bar_label('HP', member.hp, member.hp_max), hp_color);
     if config.ui.show_mp and member.mp_max > 0 then
         local mp_color = ResourceStyle.mp_color(member.mp_percent / 100);
-        styled_progress(imgui, member.mp_percent / 100, {card_width, 8}, ResourceStyle.bar_label('MP', member.mp, member.mp_max, config.ui.font_scale), mp_color);
+        local mp_bar_h = ResourceStyle.bar_height(10, config.ui.font_scale);
+        styled_progress(imgui, member.mp_percent / 100, {card_width, mp_bar_h}, ResourceStyle.bar_label('MP', member.mp, member.mp_max), mp_color);
     end
     local recommendation = member.remedy_recommendation;
     if config.ui.show_remedy_button and recommendation then
@@ -450,17 +458,6 @@ function AshitaShell.render(model, now, callbacks)
         end
         if not config.ui.minimal_mode then imgui.TextDisabled('By: Schmeee'); end
 
-        if config.ui.show_action_bar then
-            imgui.Separator();
-            for _, action_key in ipairs({'primary', 'secondary', 'emergency', 'refresh'}) do
-                local action = config.actions[action_key];
-                if action.enabled then
-                    if imgui.Button(action.label .. '##action_' .. action_key) then model:request_action(action_key, now); end
-                    imgui.SameLine();
-                end
-            end
-            imgui.NewLine();
-        end
     end
     imgui.End();
     changed = render_settings_window(imgui, model, callbacks) or changed;

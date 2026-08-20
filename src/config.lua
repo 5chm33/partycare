@@ -1,7 +1,7 @@
 local Util = require('src.util');
 
 local Config = {};
-Config.VERSION = 14;
+Config.VERSION = 15;
 
 Config.DEFAULT = {
     version = Config.VERSION,
@@ -53,6 +53,10 @@ Config.DEFAULT = {
         left = {spell = 'Cure IV', enabled = true},
         right = {spell = 'Regen', enabled = false},
         middle = {spell = 'Cure V', enabled = false},
+        mouse4 = {spell = 'Cure III', enabled = false},
+        mouse5 = {spell = 'Cure V', enabled = false},
+        wheel_up = {spell = 'Regen', enabled = false},
+        wheel_down = {spell = 'Cure III', enabled = false},
     },
     colors = {
         healthy = {0.15, 0.70, 0.35, 1.00}, warning = {0.92, 0.63, 0.12, 1.00},
@@ -74,7 +78,7 @@ local ACTION_KEYS = {primary = true, secondary = true, emergency = true, refresh
 local REMEDY_FIELDS = {spell = true, enabled = true, priority = true};
 local REVIEW_FIELDS = {review_click_cast_enabled = true, approval_status = true};
 local LIVE_TEST_FIELDS = {manual_dispatch_enabled = true, emergency_stop = true};
-local DIRECT_CLICK_FIELDS = {enabled = true, left = true, right = true, middle = true};
+local DIRECT_CLICK_FIELDS = {enabled = true, left = true, right = true, middle = true, mouse4 = true, mouse5 = true, wheel_up = true, wheel_down = true};
 local DIRECT_CLICK_BINDING_FIELDS = {spell = true, enabled = true};
 local COLOR_KEYS = {healthy = true, warning = true, critical = true, inactive = true};
 
@@ -134,6 +138,9 @@ local function migrate(raw)
         end
         if previous_version < 14 then
             -- Full Alliance preview is display-only and defaults off after migration.
+        end
+        if previous_version < 15 then
+            -- Side-button and wheel bindings are explicit manual inputs and default disabled.
         end
         for key, default_binding in pairs(Config.DEFAULT.direct_click) do
             if key ~= 'enabled' then raw.direct_click[key] = raw.direct_click[key] or Util.copy(default_binding); end
@@ -224,7 +231,7 @@ function Config.validate(raw)
     if type(raw.direct_click) ~= 'table' then table.insert(errors, 'direct_click must be a table'); else
         unknown_fields(raw.direct_click, DIRECT_CLICK_FIELDS, 'direct_click', errors);
         if type(raw.direct_click.enabled) ~= 'boolean' then table.insert(errors, 'direct_click.enabled must be boolean'); else result.direct_click.enabled = raw.direct_click.enabled; end
-        for _, key in ipairs({'left', 'right', 'middle'}) do validate_binding(raw.direct_click[key], 'direct_click.' .. key, DIRECT_CLICK_BINDING_FIELDS, result.direct_click[key], errors, false); end
+        for _, key in ipairs({'left', 'right', 'middle', 'mouse4', 'mouse5', 'wheel_up', 'wheel_down'}) do validate_binding(raw.direct_click[key], 'direct_click.' .. key, DIRECT_CLICK_BINDING_FIELDS, result.direct_click[key], errors, false); end
     end
 
     if type(raw.colors) ~= 'table' then table.insert(errors, 'colors must be a table'); else

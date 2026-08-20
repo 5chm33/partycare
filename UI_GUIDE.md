@@ -8,7 +8,7 @@ Every card presents the information needed for a manual healing decision without
 
 | Element | Meaning |
 |---|---|
-| **Name header** | The party member’s name and current status text. A direct-click binding acts on this frame. |
+| **Name header** | The party member’s name and current status text. One configured direct input acts on this frame. |
 | **HP bar** | A fully readable compact percentage. HP is green above the warning threshold, yellow between warning and critical, and red at critical levels. |
 | **MP bar** | A fully readable compact percentage; hide it from the General tab when it is not needed. MP is blue at high values, shifts through teal/yellow as it falls, and becomes red when critical. |
 | **Remedy button** | Appears only for a member with a recognized, enabled removable status. A light amber pulse draws attention to it; it names the spell currently selected by the priority rules. |
@@ -36,10 +36,7 @@ Open `/partycare config` and use the **General** tab to customize the grid.
 | **Show Remedy Button** | Shows or hides the card-level remedy control. |
 | **Show Alliance 2 / 3** | Adds that alliance party as a labeled grid section only when enabled and active members are present. |
 | **Full Alliance Layout Preview** | Shows all eighteen display-only preview cards so you can arrange card size, column count, and position before a live alliance. Preview cards cannot select targets or create casts. |
-| **Show Legacy Spell Bar** | Restores the old Cure/Regen/Refresh action row beneath the grid. It is off by default. |
 
-## Direct Clicks and Spell Bar
+## Direct Bindings
 
-Direct frame clicks are the primary healing interaction. Configure left, right, and middle-click spell bindings in the **Direct Click** tab.
-
-The legacy spell bar remains available as an optional accessibility preference. Enable it in **General**, then adjust Cure, Regen, emergency healing, and Refresh in the **Spells** tab.
+Direct card inputs are the primary healing interaction. Configure left, right, middle, Mouse 4, Mouse 5, Wheel Up, and Wheel Down spell bindings in the **Direct Click** tab. Mouse 4 and Mouse 5 require a mouse that exposes those buttons to Ashita; wheel bindings require the cursor to remain over the intended card. Each recognized input creates at most one manual cast request, and all optional extended bindings start disabled.
