@@ -9,6 +9,7 @@ do
 end
 
 local window_initialized = {main = false, settings = false};
+local main_layout_signature = nil;
 local edit_buffers = {};
 local settings_tab = 'general';
 local settings_feedback = nil;
@@ -121,6 +122,16 @@ local function set_window_alpha(imgui, alpha)
     if type(imgui.SetNextWindowBgAlpha) == 'function' then imgui.SetNextWindowBgAlpha(alpha); end
 end
 
+local function push_window_background(imgui, alpha)
+    local window_bg = rawget(_G, 'ImGuiCol_WindowBg');
+    if window_bg and type(imgui.PushStyleColor) == 'function' and type(imgui.PopStyleColor) == 'function' then
+        -- Explicitly style the window background because some Ashita themes ignore SetNextWindowBgAlpha.
+        imgui.PushStyleColor(window_bg, {0.025, 0.035, 0.055, alpha});
+        return true;
+    end
+    return false;
+end
+
 local function pulsing_remedy_button(imgui, label, size, now)
     local pushed = false;
     local button_color = rawget(_G, 'ImGuiCol_Button');
@@ -156,6 +167,7 @@ end
 
 function AshitaShell.reset_window_positions()
     window_initialized = {main = false, settings = false};
+    main_layout_signature = nil;
     edit_buffers = {};
     settings_tab = 'general';
     settings_feedback = nil;
@@ -227,10 +239,11 @@ local function render_general_tab(imgui, model, config)
     if toggle_button(imgui, 'Full Alliance Layout Preview', config.ui.full_alliance_preview, function(value) mutate(model, function(candidate) candidate.ui.full_alliance_preview = value; end); end) then changed = true; end
     if config.ui.full_alliance_preview then imgui.TextDisabled('Preview cards are display-only and cannot select targets or cast spells.'); end
     imgui.Separator();
-    if stepper(imgui, 'Grid Columns', config.ui.grid_columns, 1, 3, 1, function(value) mutate(model, function(candidate) candidate.ui.grid_columns = value; end); window_initialized.main = false; end) then changed = true; end
+    if stepper(imgui, 'Grid Columns', config.ui.grid_columns, 1, 6, 1, function(value) mutate(model, function(candidate) candidate.ui.grid_columns = value; end); window_initialized.main = false; end) then changed = true; end
     if stepper(imgui, 'Card Width', config.ui.card_width, 140, 360, 10, function(value) mutate(model, function(candidate) candidate.ui.card_width = value; end); window_initialized.main = false; end) then changed = true; end
     if stepper(imgui, 'Card Height', config.ui.card_height, 52, 120, 2, function(value) mutate(model, function(candidate) candidate.ui.card_height = value; end) end) then changed = true; end
-    if stepper(imgui, 'Transparency', config.ui.background_alpha * 100, 15, 95, 5, function(value) mutate(model, function(candidate) candidate.ui.background_alpha = value / 100; end); end) then changed = true; end
+    if stepper(imgui, 'Panel Opacity', config.ui.background_alpha * 100, 5, 90, 5, function(value) mutate(model, function(candidate) candidate.ui.background_alpha = value / 100; end); end) then changed = true; end
+    imgui.TextDisabled('Lower opacity is more transparent.');
     if not config.ui.adaptive_scale then
         if stepper(imgui, 'Text Scale', config.ui.font_scale * 100, 60, 180, 5, function(value) mutate(model, function(candidate) candidate.ui.font_scale = value / 100; end); end) then changed = true; end
     end
@@ -332,8 +345,16 @@ local function render_settings_window(imgui, model, callbacks)
     return changed;
 end
 
-local function grid_window_width(config)
-    return config.ui.grid_columns * config.ui.card_width + (config.ui.grid_columns - 1) * 8 + 20;
+local function grid_window_width(config, groups)
+    local columns = 1;
+    for _, group in ipairs(groups or {}) do columns = math.max(columns, math.min(config.ui.grid_columns, #group.members)); end
+    return columns * config.ui.card_width + (columns - 1) * 8 + 20;
+end
+
+local function grid_layout_signature(config, groups)
+    local counts = {};
+    for _, group in ipairs(groups or {}) do table.insert(counts, tostring(#group.members)); end
+    return table.concat({tostring(config.ui.full_alliance_preview), tostring(config.ui.grid_columns), tostring(config.ui.card_width), table.concat(counts, ',')}, '|');
 end
 
 local function preview_member(slot)
@@ -424,8 +445,15 @@ function AshitaShell.render(model, now, callbacks)
     local config = view.config;
     if not config.ui.visible then return {}, nil, false; end
 
+    local groups = visible_member_groups(view.members, config);
+    local layout_signature = grid_layout_signature(config, groups);
+    if main_layout_signature ~= layout_signature then
+        main_layout_signature = layout_signature;
+        window_initialized.main = false;
+    end
     set_window_alpha(imgui, config.ui.background_alpha);
-    initialize_window(imgui, 'main', config.ui.x, config.ui.y, grid_window_width(config), config.ui.height);
+    local background_pushed = push_window_background(imgui, config.ui.background_alpha);
+    initialize_window(imgui, 'main', config.ui.x, config.ui.y, grid_window_width(config, groups), config.ui.height);
     local titlebar_flag = config.ui.minimal_mode and _G.ImGuiWindowFlags_NoTitleBar or nil;
     local open;
     if titlebar_flag then open = imgui.Begin('PartyCare##grid', true, titlebar_flag); else open = imgui.Begin('PartyCare##grid'); end
@@ -445,7 +473,7 @@ function AshitaShell.render(model, now, callbacks)
             imgui.Separator();
         end
 
-        local groups = visible_member_groups(view.members, config);
+        groups = visible_member_groups(view.members, config);
         for group_index, group in ipairs(groups) do
             if #groups > 1 then
                 if group_index > 1 then imgui.Separator(); end
@@ -460,6 +488,7 @@ function AshitaShell.render(model, now, callbacks)
 
     end
     imgui.End();
+    if background_pushed then imgui.PopStyleColor(1); end
     changed = render_settings_window(imgui, model, callbacks) or changed;
     return model:drain_audit(), nil, changed;
 end

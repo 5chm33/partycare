@@ -25,17 +25,17 @@ Open `/partycare config` and use the **General** tab to customize the grid.
 
 | Setting | Effect |
 |---|---|
-| **Grid Columns** | One, two, or three cards per row. |
+| **Grid Columns** | One through six cards per row, including wide landscape alliance layouts. |
 | **Card Width** | Width of each party frame. |
 | **Card Height** | Space reserved for each party frame. |
 | **Adaptive Card Scaling** | Updates card width, height, and text scale as you resize the panel. Resource labels consistently use the clear compact `HP 72%` / `MP 48%` format so they never clip. Turn it off to use a manual Text Scale. |
 | **Minimal Live Frame** | Hides PartyCare’s in-panel title and Settings control during play. |
-| **Transparency** | Panel background opacity, from subtle to nearly opaque. |
+| **Panel Opacity** | Panel background opacity from 5% to 90%. Lower values are more transparent; PartyCare also applies an explicit background style for themes that ignore the standard opacity setting. |
 | **Show MP Bar** | Shows or hides MP within every card. |
 | **Show Status Text** | Shows or hides the status label in the card header. |
 | **Show Remedy Button** | Shows or hides the card-level remedy control. |
 | **Show Alliance 2 / 3** | Adds that alliance party as a labeled grid section only when enabled and active members are present. |
-| **Full Alliance Layout Preview** | Shows all eighteen display-only preview cards so you can arrange card size, column count, and position before a live alliance. Preview cards cannot select targets or create casts. |
+| **Full Alliance Layout Preview** | Shows all eighteen display-only preview cards so you can arrange card size, column count, and position before a live alliance. Preview cards cannot select targets or create casts. When disabled, the panel re-requests a compact size for the actual active party. |
 
 ## Direct Bindings
 

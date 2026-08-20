@@ -1,7 +1,7 @@
 local Util = require('src.util');
 
 local Config = {};
-Config.VERSION = 15;
+Config.VERSION = 16;
 
 Config.DEFAULT = {
     version = Config.VERSION,
@@ -10,7 +10,7 @@ Config.DEFAULT = {
         x = 24, y = 180, settings_x = 360, settings_y = 180,
         width = 420, height = 0, member_height = 24,
         layout = 'grid', grid_columns = 2, card_width = 200, card_height = 74,
-        background_alpha = 0.52,
+        background_alpha = 0.28,
         minimal_mode = true, adaptive_scale = true, font_scale = 1.00,
         show_mp = true, show_status = true, show_action_bar = false, show_remedy_button = true,
         show_alliance_2 = false, show_alliance_3 = false, full_alliance_preview = false,
@@ -142,6 +142,9 @@ local function migrate(raw)
         if previous_version < 15 then
             -- Side-button and wheel bindings are explicit manual inputs and default disabled.
         end
+        if previous_version < 16 then
+            -- Layout can use up to six columns; existing transparency is preserved until the user changes it.
+        end
         for key, default_binding in pairs(Config.DEFAULT.direct_click) do
             if key ~= 'enabled' then raw.direct_click[key] = raw.direct_click[key] or Util.copy(default_binding); end
         end
@@ -195,8 +198,8 @@ function Config.validate(raw)
         end
         if Util.is_finite_number(raw.ui.height) and raw.ui.height >= 0 then result.ui.height = raw.ui.height else table.insert(errors, 'ui.height must be non-negative'); end
         if raw.ui.layout ~= 'grid' then table.insert(errors, 'ui.layout must be grid'); else result.ui.layout = raw.ui.layout; end
-        if not Util.is_integer(raw.ui.grid_columns) or raw.ui.grid_columns < 1 or raw.ui.grid_columns > 3 then table.insert(errors, 'ui.grid_columns must be an integer from 1 to 3'); else result.ui.grid_columns = raw.ui.grid_columns; end
-        if not Util.is_finite_number(raw.ui.background_alpha) or raw.ui.background_alpha < 0.15 or raw.ui.background_alpha > 0.95 then table.insert(errors, 'ui.background_alpha must be between 0.15 and 0.95'); else result.ui.background_alpha = raw.ui.background_alpha; end
+        if not Util.is_integer(raw.ui.grid_columns) or raw.ui.grid_columns < 1 or raw.ui.grid_columns > 6 then table.insert(errors, 'ui.grid_columns must be an integer from 1 to 6'); else result.ui.grid_columns = raw.ui.grid_columns; end
+        if not Util.is_finite_number(raw.ui.background_alpha) or raw.ui.background_alpha < 0.05 or raw.ui.background_alpha > 0.90 then table.insert(errors, 'ui.background_alpha must be between 0.05 and 0.90'); else result.ui.background_alpha = raw.ui.background_alpha; end
         if not Util.is_finite_number(raw.ui.font_scale) or raw.ui.font_scale < 0.60 or raw.ui.font_scale > 1.80 then table.insert(errors, 'ui.font_scale must be between 0.60 and 1.80'); else result.ui.font_scale = raw.ui.font_scale; end
     end
 

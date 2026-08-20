@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 15,
+    version = 16,
     ui = {
         visible = true,
         locked = false,
@@ -18,7 +18,7 @@ return {
         grid_columns = 2,
         card_width = 200,
         card_height = 74,
-        background_alpha = 0.52,
+        background_alpha = 0.28,
         minimal_mode = true,
         adaptive_scale = true,
         font_scale = 1.00,
