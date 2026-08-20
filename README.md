@@ -32,7 +32,7 @@ The compact Settings window has four tabs.
 
 | Tab | Purpose |
 |---|---|
-| **General** | Position, transparent grid columns/card size, adaptive text scaling, Alliance 2/3 visibility, display options, and health thresholds. |
+| **General** | Position, transparent grid columns/card size, adaptive text scaling, Alliance 2/3 visibility, display options, a safe Full Alliance layout preview, and health thresholds. |
 | **Direct Click** | Left, right, and middle party-frame bindings. |
 | **Spells** | Manual action-bar bindings for Cure, Regen, emergency healing, and optional Refresh. |
 | **Remedies** | Spell, enable state, and priority for each removable status. |
@@ -49,7 +49,7 @@ Alliance member HP/MP data is available through Ashita’s party interface. Part
 
 ## Grid Cards and Remedies
 
-Each party member appears as a compact card with name, HP, optional MP, and a card-level **Remedy** button when PartyCare recognizes an enabled removable status. The Remedy button is independent of direct clicks: one explicit Remedy click resolves only the highest-priority recognized status for that member. **Minimal Live Frame** is on by default, leaving only the transparent party cards during play; use `/partycare` or `/pc` whenever you want to open Settings. **Adaptive Card Scaling** adjusts card and text scale as you resize the panel. See [UI_GUIDE.md](UI_GUIDE.md) for the complete card-layout reference.
+Each party member appears as a compact card with name, unclipped HP/MP percentage bars, and a card-level **Remedy** button when PartyCare recognizes an enabled removable status. The Remedy button receives a subtle amber pulse but remains independent of direct clicks: one explicit Remedy click resolves only the highest-priority recognized status for that member. **Minimal Live Frame** is on by default, leaving only the transparent party cards during play; use `/partycare` or `/pc` whenever you want to open Settings. The Settings window includes a top-right **X** as well as its labeled Close controls. **Adaptive Card Scaling** adjusts card and text scale as you resize the panel, and **Full Alliance Layout Preview** displays eighteen inert cards so you can position the grid before a live alliance. See [UI_GUIDE.md](UI_GUIDE.md) for the complete card-layout reference.
 
 ## Direct Clicks
 

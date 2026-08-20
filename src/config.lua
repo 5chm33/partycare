@@ -1,7 +1,7 @@
 local Util = require('src.util');
 
 local Config = {};
-Config.VERSION = 13;
+Config.VERSION = 14;
 
 Config.DEFAULT = {
     version = Config.VERSION,
@@ -13,7 +13,7 @@ Config.DEFAULT = {
         background_alpha = 0.52,
         minimal_mode = true, adaptive_scale = true, font_scale = 1.00,
         show_mp = true, show_status = true, show_action_bar = false, show_remedy_button = true,
-        show_alliance_2 = false, show_alliance_3 = false,
+        show_alliance_2 = false, show_alliance_3 = false, full_alliance_preview = false,
     },
     thresholds = {warning_hp = 55, critical_hp = 30},
     actions = {
@@ -66,7 +66,7 @@ local UI_FIELDS = {
     width = true, height = true, member_height = true, layout = true, grid_columns = true, card_width = true, card_height = true,
     background_alpha = true, minimal_mode = true, adaptive_scale = true, font_scale = true,
     show_mp = true, show_status = true, show_action_bar = true, show_remedy_button = true,
-    show_alliance_2 = true, show_alliance_3 = true,
+    show_alliance_2 = true, show_alliance_3 = true, full_alliance_preview = true,
 };
 local THRESHOLD_FIELDS = {warning_hp = true, critical_hp = true};
 local ACTION_FIELDS = {label = true, spell = true, enabled = true};
@@ -91,7 +91,7 @@ local function migrate(raw)
         local previous_version = raw.version;
         raw.version = Config.VERSION;
         raw.ui, raw.actions, raw.remedies, raw.review, raw.live_test, raw.direct_click = raw.ui or {}, raw.actions or {}, raw.remedies or {}, raw.review or {}, raw.live_test or {}, raw.direct_click or {};
-        for _, key in ipairs({'height', 'settings_open', 'settings_x', 'settings_y', 'layout', 'grid_columns', 'card_width', 'card_height', 'background_alpha', 'minimal_mode', 'adaptive_scale', 'font_scale', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3'}) do
+        for _, key in ipairs({'height', 'settings_open', 'settings_x', 'settings_y', 'layout', 'grid_columns', 'card_width', 'card_height', 'background_alpha', 'minimal_mode', 'adaptive_scale', 'font_scale', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
             if raw.ui[key] == nil then raw.ui[key] = Config.DEFAULT.ui[key]; end
         end
         for key, default_action in pairs(Config.DEFAULT.actions) do
@@ -131,6 +131,9 @@ local function migrate(raw)
         end
         if previous_version < 13 then
             -- Newly introduced remedy rules are populated from Config.DEFAULT above.
+        end
+        if previous_version < 14 then
+            -- Full Alliance preview is display-only and defaults off after migration.
         end
         for key, default_binding in pairs(Config.DEFAULT.direct_click) do
             if key ~= 'enabled' then raw.direct_click[key] = raw.direct_click[key] or Util.copy(default_binding); end
@@ -174,7 +177,7 @@ function Config.validate(raw)
     unknown_fields(raw, ROOT_FIELDS, 'configuration', errors);
     if type(raw.ui) ~= 'table' then table.insert(errors, 'ui must be a table'); else
         unknown_fields(raw.ui, UI_FIELDS, 'ui', errors);
-        for _, key in ipairs({'visible', 'locked', 'settings_open', 'minimal_mode', 'adaptive_scale', 'show_mp', 'show_status', 'show_action_bar', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3'}) do
+        for _, key in ipairs({'visible', 'locked', 'settings_open', 'minimal_mode', 'adaptive_scale', 'show_mp', 'show_status', 'show_action_bar', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
             if type(raw.ui[key]) == 'boolean' then result.ui[key] = raw.ui[key] else table.insert(errors, 'ui.' .. key .. ' must be boolean'); end
         end
         for _, key in ipairs({'x', 'y', 'settings_x', 'settings_y'}) do

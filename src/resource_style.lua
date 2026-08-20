@@ -32,13 +32,11 @@ function ResourceStyle.mp_color(percent)
     return MP_HIGH, 'high';
 end
 
-function ResourceStyle.bar_label(prefix, current, maximum, font_scale)
+function ResourceStyle.bar_label(prefix, current, maximum)
     if type(maximum) ~= 'number' or maximum <= 0 then return prefix .. ' —'; end
     local percent = math.floor((current / maximum) * 100 + 0.5);
-    if (font_scale or 1) < 0.88 then
-        return string.format('%s %d%%', prefix, percent);
-    end
-    return string.format('%s %d / %d (%d%%)', prefix, current, maximum, percent);
+    -- Resource bars are deliberately compact so the full label remains readable at every adaptive scale.
+    return string.format('%s %d%%', prefix, percent);
 end
 
 return ResourceStyle;

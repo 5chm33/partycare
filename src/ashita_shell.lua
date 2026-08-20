@@ -121,6 +121,20 @@ local function set_window_alpha(imgui, alpha)
     if type(imgui.SetNextWindowBgAlpha) == 'function' then imgui.SetNextWindowBgAlpha(alpha); end
 end
 
+local function pulsing_remedy_button(imgui, label, size, now)
+    local pushed = false;
+    local button_color = rawget(_G, 'ImGuiCol_Button');
+    if button_color and type(imgui.PushStyleColor) == 'function' and type(imgui.PopStyleColor) == 'function' then
+        local pulse = (math.sin((tonumber(now) or 0) * 3.5) + 1) / 2;
+        -- Soft amber modulation draws attention while keeping the card readable against a transparent frame.
+        imgui.PushStyleColor(button_color, {0.58 + pulse * 0.16, 0.29 + pulse * 0.10, 0.07, 0.76 + pulse * 0.16});
+        pushed = true;
+    end
+    local pressed = imgui.Button(label, size);
+    if pushed then imgui.PopStyleColor(1); end
+    return pressed;
+end
+
 function AshitaShell.available()
     local imgui = get_imgui();
     return type(imgui) == 'table' and type(imgui.Begin) == 'function' and type(imgui.End) == 'function';
@@ -151,6 +165,8 @@ local MOUSE_BUTTONS = {left = 0, right = 1, middle = 2};
 
 local function member_click(imgui, model, member, now, width, height)
     local pressed = imgui.Button(member_label(member, tostring(model:view().selected_member_id) == tostring(member.id)) .. '##member_' .. tostring(member.id), {width, height});
+    -- Layout-preview cards are deliberately inert: they only show size, ordering, and grid flow.
+    if member.layout_preview then return false; end
     local button = nil;
     if type(imgui.IsItemClicked) == 'function' then
         for name, code in pairs(MOUSE_BUTTONS) do if imgui.IsItemClicked(code) then button = name; break; end end
@@ -192,6 +208,8 @@ local function render_general_tab(imgui, model, config)
     if toggle_button(imgui, 'Show Remedy Button', config.ui.show_remedy_button, function(value) mutate(model, function(candidate) candidate.ui.show_remedy_button = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Alliance 2', config.ui.show_alliance_2, function(value) mutate(model, function(candidate) candidate.ui.show_alliance_2 = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Alliance 3', config.ui.show_alliance_3, function(value) mutate(model, function(candidate) candidate.ui.show_alliance_3 = value; end); end) then changed = true; end
+    if toggle_button(imgui, 'Full Alliance Layout Preview', config.ui.full_alliance_preview, function(value) mutate(model, function(candidate) candidate.ui.full_alliance_preview = value; end); end) then changed = true; end
+    if config.ui.full_alliance_preview then imgui.TextDisabled('Preview cards are display-only and cannot select targets or cast spells.'); end
     if toggle_button(imgui, 'Show Legacy Spell Bar', config.ui.show_action_bar, function(value) mutate(model, function(candidate) candidate.ui.show_action_bar = value; end); end) then changed = true; end
     imgui.Separator();
     if stepper(imgui, 'Grid Columns', config.ui.grid_columns, 1, 3, 1, function(value) mutate(model, function(candidate) candidate.ui.grid_columns = value; end); window_initialized.main = false; end) then changed = true; end
@@ -285,6 +303,12 @@ local function render_settings_window(imgui, model, callbacks)
         if imgui.Button('Save & Close', {120, 0}) then save_settings(model, callbacks); close_settings(model); changed = true; end
         imgui.SameLine();
         if imgui.Button('Close', {80, 0}) then close_settings(model); changed = true; end
+        if type(imgui.GetWindowWidth) == 'function' and type(imgui.SetCursorPosX) == 'function' then
+            imgui.SetCursorPosX(math.max(0, imgui.GetWindowWidth() - 32));
+        elseif type(imgui.SameLine) == 'function' then
+            imgui.SameLine();
+        end
+        if imgui.Button('X##partycare_settings_top_close', {24, 0}) then close_settings(model); changed = true; end
         if settings_feedback then imgui.TextDisabled(settings_feedback); end
         imgui.Separator();
         if tab_button(imgui, 'general', 'General') then changed = true; end
@@ -306,7 +330,32 @@ local function grid_window_width(config)
     return config.ui.grid_columns * config.ui.card_width + (config.ui.grid_columns - 1) * 8 + 20;
 end
 
+local function preview_member(slot)
+    local group = math.floor(slot / 6) + 1;
+    local position = (slot % 6) + 1;
+    local hp_percent = ({100, 92, 84, 76, 68, 60})[position];
+    local mp_percent = ({100, 88, 76, 64, 52, 40})[position];
+    return {
+        id = 'layout_preview_' .. tostring(slot), party_slot = slot, alliance_group = group,
+        name = string.format('Preview %d-%d', group, position),
+        hp = hp_percent, hp_max = 100, hp_percent = hp_percent,
+        mp = mp_percent, mp_max = 100, mp_percent = mp_percent,
+        layout_preview = true, status = '', status_feed_available = true, status_icon_count = 0,
+    };
+end
+
+local function full_alliance_preview_groups()
+    local groups = {};
+    for group = 1, 3 do
+        local members = {};
+        for position = 1, 6 do table.insert(members, preview_member((group - 1) * 6 + position - 1)); end
+        table.insert(groups, {id = group, label = 'Preview Alliance ' .. tostring(group), members = members});
+    end
+    return groups;
+end
+
 local function visible_member_groups(members, config)
+    if config.ui.full_alliance_preview then return full_alliance_preview_groups(); end
     local groups = {{id = 1, label = 'Party', members = {}}};
     if config.ui.show_alliance_2 then table.insert(groups, {id = 2, label = 'Alliance 2', members = {}}); end
     if config.ui.show_alliance_3 then table.insert(groups, {id = 3, label = 'Alliance 3', members = {}}); end
@@ -336,7 +385,7 @@ local function render_member_card(imgui, model, member, now, config)
     local recommendation = member.remedy_recommendation;
     if config.ui.show_remedy_button and recommendation then
         local remedy_label = 'Remedy: ' .. recommendation.spell .. ' (' .. recommendation.debuff .. ')##remedy_' .. tostring(member.id);
-        if imgui.Button(remedy_label, {card_width, 16}) then
+        if pulsing_remedy_button(imgui, remedy_label, {card_width, 16}, now) then
             model:select_member(member.id);
             model:request_remedy(now);
         end
@@ -345,8 +394,6 @@ local function render_member_card(imgui, model, member, now, config)
         end
     elseif config.ui.show_status and type(member.detected_remedies) == 'table' and #member.detected_remedies > 0 then
         imgui.TextDisabled('Detected: ' .. table.concat(member.detected_remedies, ', '));
-    elseif config.ui.show_status and member.status_feed_available and member.status_icon_count > 0 then
-        imgui.TextDisabled('Status icons detected — no enabled Remedy rule');
     elseif config.ui.show_status and not member.status_feed_available then
         imgui.TextDisabled('Status feed unavailable');
     elseif config.ui.show_status and member.status ~= '' then

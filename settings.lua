@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 13,
+    version = 14,
     ui = {
         visible = true,
         locked = false,
@@ -28,6 +28,7 @@ return {
         show_remedy_button = true,
         show_alliance_2 = false,
         show_alliance_3 = false,
+        full_alliance_preview = false, -- Display-only 18-card layout preview for arranging the panel.
     },
     thresholds = {warning_hp = 55, critical_hp = 30},
     actions = {

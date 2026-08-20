@@ -9,9 +9,9 @@ Every card presents the information needed for a manual healing decision without
 | Element | Meaning |
 |---|---|
 | **Name header** | The party member’s name and current status text. A direct-click binding acts on this frame. |
-| **HP bar** | Current and maximum HP with percentage. HP is green above the warning threshold, yellow between warning and critical, and red at critical levels. |
-| **MP bar** | Current and maximum MP; hide it from the General tab when it is not needed. MP is blue at high values, shifts through teal/yellow as it falls, and becomes red when critical. |
-| **Remedy button** | Appears only for a member with a recognized, enabled removable status. It names the spell currently selected by the priority rules. |
+| **HP bar** | A fully readable compact percentage. HP is green above the warning threshold, yellow between warning and critical, and red at critical levels. |
+| **MP bar** | A fully readable compact percentage; hide it from the General tab when it is not needed. MP is blue at high values, shifts through teal/yellow as it falls, and becomes red when critical. |
+| **Remedy button** | Appears only for a member with a recognized, enabled removable status. A light amber pulse draws attention to it; it names the spell currently selected by the priority rules. |
 
 The card-level **Remedy** button is separate from direct healing clicks. It does not run when you left-click a party frame. One deliberate Remedy click applies one configured remedy to that card’s member, using the highest-priority recognized active status.
 
@@ -28,13 +28,14 @@ Open `/partycare config` and use the **General** tab to customize the grid.
 | **Grid Columns** | One, two, or three cards per row. |
 | **Card Width** | Width of each party frame. |
 | **Card Height** | Space reserved for each party frame. |
-| **Adaptive Card Scaling** | Updates card width, height, and text scale as you resize the panel. At small scales, bar labels collapse to a clear `HP 72%` / `MP 48%` format rather than clipping. Turn it off to use a manual Text Scale. |
+| **Adaptive Card Scaling** | Updates card width, height, and text scale as you resize the panel. Resource labels consistently use the clear compact `HP 72%` / `MP 48%` format so they never clip. Turn it off to use a manual Text Scale. |
 | **Minimal Live Frame** | Hides PartyCare’s in-panel title and Settings control during play. |
 | **Transparency** | Panel background opacity, from subtle to nearly opaque. |
 | **Show MP Bar** | Shows or hides MP within every card. |
 | **Show Status Text** | Shows or hides the status label in the card header. |
 | **Show Remedy Button** | Shows or hides the card-level remedy control. |
 | **Show Alliance 2 / 3** | Adds that alliance party as a labeled grid section only when enabled and active members are present. |
+| **Full Alliance Layout Preview** | Shows all eighteen display-only preview cards so you can arrange card size, column count, and position before a live alliance. Preview cards cannot select targets or create casts. |
 | **Show Legacy Spell Bar** | Restores the old Cure/Regen/Refresh action row beneath the grid. It is off by default. |
 
 ## Direct Clicks and Spell Bar
