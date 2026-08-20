@@ -51,6 +51,9 @@ function Party.normalize_member(raw, position)
         active = raw.active ~= false,
         status = type(raw.status) == 'string' and raw.status or '',
         debuffs = debuffs,
+        status_feed_available = raw.status_feed_available == true,
+        status_icon_count = Util.is_integer(raw.status_icon_count) and math.max(0, raw.status_icon_count) or 0,
+        status_source = type(raw.status_source) == 'string' and raw.status_source or '',
     };
     normalized.hp_percent = normalized.hp / normalized.hp_max * 100;
     normalized.mp_percent = normalized.mp_max == 0 and 0 or normalized.mp / normalized.mp_max * 100;

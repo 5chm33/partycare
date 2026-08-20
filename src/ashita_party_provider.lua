@@ -35,25 +35,60 @@ local function alliance_group(slot)
 end
 
 local function decode_icons(icons)
-    local found, debuffs = {}, {};
-    if type(icons) ~= 'table' then return debuffs; end
-    for _, raw_id in ipairs(icons) do
-        local rule_id = STATUS_TO_REMEDY_RULE[tonumber(raw_id)];
-        if rule_id and not found[rule_id] then
-            found[rule_id] = true;
-            table.insert(debuffs, rule_id);
+    local found, debuffs, observed = {}, {}, 0;
+    if type(icons) ~= 'table' then return debuffs, observed, false; end
+    -- pairs intentionally supports bindings that expose zero-indexed status arrays.
+    for _, raw_id in pairs(icons) do
+        local status_id = tonumber(raw_id);
+        if status_id and status_id > 0 then
+            observed = observed + 1;
+            local rule_id = STATUS_TO_REMEDY_RULE[status_id];
+            if rule_id and not found[rule_id] then
+                found[rule_id] = true;
+                table.insert(debuffs, rule_id);
+            end
         end
     end
-    return debuffs;
+    table.sort(debuffs);
+    return debuffs, observed, true;
+end
+
+local function merge_status_sources(sources)
+    local found, debuffs, observed, names, available = {}, {}, 0, {}, false;
+    for _, source in ipairs(sources) do
+        local decoded, count, is_available = decode_icons(source.values);
+        if is_available then
+            available = true;
+            table.insert(names, source.name);
+            observed = observed + count;
+            for _, rule_id in ipairs(decoded) do
+                if not found[rule_id] then found[rule_id] = true; table.insert(debuffs, rule_id); end
+            end
+        end
+    end
+    table.sort(debuffs);
+    return debuffs, {available = available, observed = observed, source = table.concat(names, ' + ')};
 end
 
 local function local_statuses_by_server_id(party)
     local records = {};
-    -- The five status records are not aligned to the six local-party slots. Associate them by server ID.
     for record_index = 0, 4 do
         local server_id = tonumber(call(party, 'GetStatusIconsServerId', record_index));
         if server_id and server_id > 0 then
-            records[server_id] = decode_icons(call(party, 'GetStatusIcons', record_index));
+            local debuffs, meta = merge_status_sources({{name = 'party_status_icons', values = call(party, 'GetStatusIcons', record_index)}});
+            records[server_id] = {debuffs = debuffs, meta = meta};
+        end
+    end
+
+    -- Ashita also documents a raw five-member status structure. Use it only to supplement missing accessor records.
+    local raw = call(party, 'GetRawStructureStatusIcons');
+    if type(raw) == 'table' and type(raw.Members) == 'table' then
+        for _, member in pairs(raw.Members) do
+            local server_id = tonumber(type(member) == 'table' and member.ServerId or nil);
+            if server_id and server_id > 0 and not records[server_id] then
+                local debuffs, meta = merge_status_sources({{name = 'party_status_raw', values = member.StatusIcons}});
+                records[server_id] = {debuffs = debuffs, meta = meta};
+            end
         end
     end
     return records;
@@ -61,7 +96,13 @@ end
 
 local function local_player_statuses(memory)
     local player = call(memory, 'GetPlayer');
-    return decode_icons(call(player, 'GetBuffs'));
+    local raw = call(player, 'GetRawStructure');
+    return merge_status_sources({
+        {name = 'player_status_icons', values = call(player, 'GetStatusIcons')},
+        {name = 'player_buffs', values = call(player, 'GetBuffs')},
+        {name = 'player_raw_status_icons', values = type(raw) == 'table' and raw.StatusIcons or nil},
+        {name = 'player_raw_buffs', values = type(raw) == 'table' and raw.Buffs or nil},
+    });
 end
 
 local function memory_manager()
@@ -80,7 +121,7 @@ function Provider.snapshot()
     if not party then return nil, 'Ashita party interface is unavailable'; end
 
     local status_by_server_id = local_statuses_by_server_id(party);
-    local self_statuses = local_player_statuses(memory);
+    local self_statuses, self_meta = local_player_statuses(memory);
     local members = {};
     for slot = 0, 17 do
         local active = call(party, 'GetMemberIsActive', slot);
@@ -88,9 +129,13 @@ function Provider.snapshot()
         if active == 1 and type(name) == 'string' and name:match('%S') then
             local group = alliance_group(slot);
             local server_id = tonumber(call(party, 'GetMemberServerId', slot)) or slot;
-            local debuffs = {};
+            local debuffs, status_meta = {}, {available = false, observed = 0, source = ''};
             if group == 1 then
-                debuffs = slot == 0 and self_statuses or (status_by_server_id[server_id] or {});
+                if slot == 0 then
+                    debuffs, status_meta = self_statuses, self_meta;
+                elseif status_by_server_id[server_id] then
+                    debuffs, status_meta = status_by_server_id[server_id].debuffs, status_by_server_id[server_id].meta;
+                end
             end
             local hp_percent = tonumber(call(party, 'GetMemberHPPercent', slot)) or 0;
             local mp_percent = tonumber(call(party, 'GetMemberMPPercent', slot)) or 0;
@@ -102,6 +147,9 @@ function Provider.snapshot()
                 hp = hp_percent, hp_max = 100,
                 mp = mp_percent, mp_max = 100,
                 debuffs = debuffs,
+                status_feed_available = status_meta.available,
+                status_icon_count = status_meta.observed,
+                status_source = status_meta.source,
             });
         end
     end

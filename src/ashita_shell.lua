@@ -345,6 +345,10 @@ local function render_member_card(imgui, model, member, now, config)
         end
     elseif config.ui.show_status and type(member.detected_remedies) == 'table' and #member.detected_remedies > 0 then
         imgui.TextDisabled('Detected: ' .. table.concat(member.detected_remedies, ', '));
+    elseif config.ui.show_status and member.status_feed_available and member.status_icon_count > 0 then
+        imgui.TextDisabled('Status icons detected — no enabled Remedy rule');
+    elseif config.ui.show_status and not member.status_feed_available then
+        imgui.TextDisabled('Status feed unavailable');
     elseif config.ui.show_status and member.status ~= '' then
         imgui.TextDisabled(member.status);
     else
