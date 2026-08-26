@@ -8,9 +8,9 @@ local PanelModel = {};
 PanelModel.__index = PanelModel;
 
 local function decorate_members(members, config)
-    local decorated = Party.decorate_members(members, config.thresholds);
+    local decorated = Party.decorate_members(members, config.thresholds, config.ui);
     for _, member in ipairs(decorated) do
-        local recommendation, candidates = Remedies.recommend(member, config.remedies);
+        local recommendation, candidates = Remedies.recommend(member, config.remedies, member.spell_availability);
         member.remedy_recommendation = recommendation;
         member.remedy_candidates = candidates;
         member.detected_remedies = Remedies.normalize_list(member);
@@ -113,6 +113,11 @@ function PanelModel:reset_layout()
         candidate.ui.minimal_mode = Config.DEFAULT.ui.minimal_mode;
         candidate.ui.adaptive_scale = Config.DEFAULT.ui.adaptive_scale;
         candidate.ui.font_scale = Config.DEFAULT.ui.font_scale;
+        candidate.ui.xiui_style = Config.DEFAULT.ui.xiui_style;
+        candidate.ui.debuff_alert_mode = Config.DEFAULT.ui.debuff_alert_mode;
+        candidate.ui.debuff_alert_preview = Config.DEFAULT.ui.debuff_alert_preview;
+        candidate.ui.refresh_pulse_enabled = Config.DEFAULT.ui.refresh_pulse_enabled;
+        candidate.ui.refresh_min_mp = Config.DEFAULT.ui.refresh_min_mp;
         candidate.ui.show_action_bar = Config.DEFAULT.ui.show_action_bar;
         candidate.ui.show_remedy_button = Config.DEFAULT.ui.show_remedy_button;
     end);

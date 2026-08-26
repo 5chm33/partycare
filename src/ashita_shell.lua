@@ -185,8 +185,28 @@ local function hovered_wheel_direction(imgui)
     return nil;
 end
 
-local function member_click(imgui, model, member, now, width, height)
+local function member_click(imgui, model, member, now, width, height, pulse_refresh, pulse_alert)
+    local pushed_count = 0;
+    if (pulse_refresh or pulse_alert) and type(imgui.PushStyleColor) == 'function' and type(imgui.PopStyleColor) == 'function' then
+        local pulse = (math.sin((tonumber(now) or 0) * 4.0) + 1) / 2;
+        local button_color = rawget(_G, 'ImGuiCol_Button');
+        local hover_color = rawget(_G, 'ImGuiCol_ButtonHovered');
+        local active_color = rawget(_G, 'ImGuiCol_ButtonActive');
+        local text_color = rawget(_G, 'ImGuiCol_Text');
+        if pulse_alert then
+            if button_color then imgui.PushStyleColor(button_color, {0.42 + pulse * 0.45, 0.03, 0.03, 0.88 + pulse * 0.12}); pushed_count = pushed_count + 1; end
+            if hover_color then imgui.PushStyleColor(hover_color, {0.96, 0.16, 0.12, 1.00}); pushed_count = pushed_count + 1; end
+            if active_color then imgui.PushStyleColor(active_color, {0.35, 0.01, 0.01, 1.00}); pushed_count = pushed_count + 1; end
+            if text_color then imgui.PushStyleColor(text_color, {1.00, 0.18 + pulse * 0.20, 0.18 + pulse * 0.10, 1.00}); pushed_count = pushed_count + 1; end
+        else
+            if button_color then imgui.PushStyleColor(button_color, {0.16 + pulse * 0.22, 0.18, 0.42 + pulse * 0.28, 0.92}); pushed_count = pushed_count + 1; end
+            if hover_color then imgui.PushStyleColor(hover_color, {0.28, 0.24, 0.62, 1.00}); pushed_count = pushed_count + 1; end
+            if active_color then imgui.PushStyleColor(active_color, {0.12, 0.12, 0.30, 1.00}); pushed_count = pushed_count + 1; end
+            if text_color then imgui.PushStyleColor(text_color, {0.72 + pulse * 0.28, 0.72 + pulse * 0.28, 0.18 + pulse * 0.22, 1.00}); pushed_count = pushed_count + 1; end
+        end
+    end
     local pressed = imgui.Button(member_label(member, tostring(model:view().selected_member_id) == tostring(member.id)) .. '##member_' .. tostring(member.id), {width, height});
+    if pushed_count > 0 then imgui.PopStyleColor(pushed_count); end
     -- Layout-preview cards are deliberately inert: they only show size, ordering, and grid flow.
     if member.layout_preview then return false; end
     local button = nil;
@@ -231,6 +251,17 @@ local function render_general_tab(imgui, model, config)
     if toggle_button(imgui, 'Lock Panel Position', config.ui.locked, function(value) mutate(model, function(candidate) candidate.ui.locked = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Minimal Live Frame', config.ui.minimal_mode, function(value) mutate(model, function(candidate) candidate.ui.minimal_mode = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Adaptive Card Scaling', config.ui.adaptive_scale, function(value) mutate(model, function(candidate) candidate.ui.adaptive_scale = value; end); end) then changed = true; end
+    if toggle_button(imgui, 'XIUI-Compatible Party Style', config.ui.xiui_style, function(value) mutate(model, function(candidate) candidate.ui.xiui_style = value; end); window_initialized.main = false; end) then changed = true; end
+    if toggle_button(imgui, 'Pulse Names Missing Refresh', config.ui.refresh_pulse_enabled, function(value) mutate(model, function(candidate) candidate.ui.refresh_pulse_enabled = value; end); end) then changed = true; end
+    if config.ui.refresh_pulse_enabled then
+        if stepper(imgui, 'Refresh Alert MP Threshold', config.ui.refresh_min_mp, 0, 9999, 25, function(value) mutate(model, function(candidate) candidate.ui.refresh_min_mp = value; end); end) then changed = true; end
+        imgui.TextDisabled('Pulses only for members above this maximum MP without a confirmed Refresh icon.');
+    end
+    if toggle_button(imgui, 'Compact Debuff Alert Mode', config.ui.debuff_alert_mode, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_mode = value; candidate.ui.debuff_alert_preview = value; end); window_initialized.main = false; end) then changed = true; end
+    if config.ui.debuff_alert_mode then
+        if toggle_button(imgui, 'Show Compact Placement Preview', config.ui.debuff_alert_preview, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_preview = value; end); window_initialized.main = false; end) then changed = true; end
+        imgui.TextDisabled('Idle alerts are fully hidden. Turn preview on only to position the compact alert box.');
+    end
     if toggle_button(imgui, 'Show MP Bar', config.ui.show_mp, function(value) mutate(model, function(candidate) candidate.ui.show_mp = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Status Text', config.ui.show_status, function(value) mutate(model, function(candidate) candidate.ui.show_status = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Remedy Button', config.ui.show_remedy_button, function(value) mutate(model, function(candidate) candidate.ui.show_remedy_button = value; end); end) then changed = true; end
@@ -347,14 +378,16 @@ end
 
 local function grid_window_width(config, groups)
     local columns = 1;
-    for _, group in ipairs(groups or {}) do columns = math.max(columns, math.min(config.ui.grid_columns, #group.members)); end
+    if not config.ui.xiui_style then
+        for _, group in ipairs(groups or {}) do columns = math.max(columns, math.min(config.ui.grid_columns, #group.members)); end
+    end
     return columns * config.ui.card_width + (columns - 1) * 8 + 20;
 end
 
 local function grid_layout_signature(config, groups)
     local counts = {};
     for _, group in ipairs(groups or {}) do table.insert(counts, tostring(#group.members)); end
-    return table.concat({tostring(config.ui.full_alliance_preview), tostring(config.ui.grid_columns), tostring(config.ui.card_width), table.concat(counts, ',')}, '|');
+    return table.concat({tostring(config.ui.full_alliance_preview), tostring(config.ui.xiui_style), tostring(config.ui.debuff_alert_mode), tostring(config.ui.grid_columns), tostring(config.ui.card_width), table.concat(counts, ',')}, '|');
 end
 
 local function preview_member(slot)
@@ -390,17 +423,81 @@ local function visible_member_groups(members, config)
     for _, group in ipairs(groups) do lookup[group.id] = group; end
     for _, member in ipairs(members) do
         local group = lookup[member.alliance_group or 1];
-        if group then table.insert(group.members, member); end
+        if group and (not config.ui.debuff_alert_mode or member.remedy_recommendation ~= nil) then table.insert(group.members, member); end
     end
     local visible = {};
     for _, group in ipairs(groups) do if #group.members > 0 then table.insert(visible, group); end end
     return visible;
 end
 
-local function render_member_card(imgui, model, member, now, config)
+local function render_xiui_member_card(imgui, model, member, now, config)
     local card_width = config.ui.card_width;
     local group_open = begin_group(imgui);
-    local clicked = member_click(imgui, model, member, now, card_width, config.ui.member_height);
+    local pushed_count = 0;
+    local button_color = rawget(_G, 'ImGuiCol_Button');
+    local hover_color = rawget(_G, 'ImGuiCol_ButtonHovered');
+    local active_color = rawget(_G, 'ImGuiCol_ButtonActive');
+    if button_color and type(imgui.PushStyleColor) == 'function' and type(imgui.PopStyleColor) == 'function' then
+        imgui.PushStyleColor(button_color, {0.12, 0.27, 0.39, 0.96}); pushed_count = pushed_count + 1;
+        if hover_color then imgui.PushStyleColor(hover_color, {0.18, 0.39, 0.55, 0.98}); pushed_count = pushed_count + 1; end
+        if active_color then imgui.PushStyleColor(active_color, {0.08, 0.20, 0.30, 1.00}); pushed_count = pushed_count + 1; end
+    end
+    member_click(imgui, model, member, now, card_width, 18, member.refresh_missing);
+    if pushed_count > 0 then imgui.PopStyleColor(pushed_count); end
+
+    local hp_color = ResourceStyle.hp_color(member.hp_percent / 100, config.thresholds.warning_hp, config.thresholds.critical_hp);
+    styled_progress(imgui, member.hp_percent / 100, {card_width, ResourceStyle.bar_height(11, config.ui.font_scale)}, 'HP  ' .. tostring(member.hp_percent) .. '%', hp_color);
+    if config.ui.show_mp and member.mp_max > 0 then
+        local mp_color = ResourceStyle.mp_color(member.mp_percent / 100);
+        styled_progress(imgui, member.mp_percent / 100, {card_width, ResourceStyle.bar_height(9, config.ui.font_scale)}, 'MP  ' .. tostring(member.mp_percent) .. '%', mp_color);
+    end
+
+    local recommendation = member.remedy_recommendation;
+    if config.ui.show_remedy_button and recommendation then
+        local remedy_label = 'Remedy: ' .. recommendation.spell .. ' (' .. recommendation.debuff .. ')##xiui_remedy_' .. tostring(member.id);
+        if pulsing_remedy_button(imgui, remedy_label, {card_width, 15}, now) then
+            model:select_member(member.id);
+            model:request_remedy(now);
+        end
+        if type(imgui.IsItemHovered) == 'function' and imgui.IsItemHovered() and type(imgui.SetTooltip) == 'function' then
+            imgui.SetTooltip('Priority ' .. tostring(recommendation.priority) .. ': ' .. recommendation.debuff .. ' → ' .. recommendation.spell);
+        end
+    elseif config.ui.show_status and type(member.detected_remedies) == 'table' and #member.detected_remedies > 0 then
+        imgui.TextDisabled('Detected: ' .. table.concat(member.detected_remedies, ', '));
+    elseif config.ui.show_status and not member.status_feed_available then
+        imgui.TextDisabled('Status feed unavailable');
+    elseif config.ui.show_status and member.status ~= '' then
+        imgui.TextDisabled(member.status);
+    else
+        dummy(imgui, card_width, 13);
+    end
+    end_group(imgui, group_open);
+end
+
+local function render_debuff_alert(imgui, model, member, now, config)
+    local card_width = config.ui.card_width;
+    local group_open = begin_group(imgui);
+    member_click(imgui, model, member, now, card_width, 18, false, true);
+    local recommendation = member.remedy_recommendation;
+    if recommendation then
+        local label = 'Remedy: ' .. recommendation.spell .. ' (' .. recommendation.debuff .. ')##alert_remedy_' .. tostring(member.id);
+        if pulsing_remedy_button(imgui, label, {card_width, 16}, now) then
+            model:select_member(member.id);
+            model:request_remedy(now);
+        end
+        if type(imgui.IsItemHovered) == 'function' and imgui.IsItemHovered() and type(imgui.SetTooltip) == 'function' then
+            imgui.SetTooltip('Priority ' .. tostring(recommendation.priority) .. ': ' .. recommendation.debuff .. ' → ' .. recommendation.spell);
+        end
+    end
+    end_group(imgui, group_open);
+end
+
+local function render_member_card(imgui, model, member, now, config)
+    if config.ui.debuff_alert_mode and not member.layout_preview then return render_debuff_alert(imgui, model, member, now, config); end
+    if config.ui.xiui_style then return render_xiui_member_card(imgui, model, member, now, config); end
+    local card_width = config.ui.card_width;
+    local group_open = begin_group(imgui);
+    local clicked = member_click(imgui, model, member, now, card_width, config.ui.member_height, member.refresh_missing);
     local latest = model:view();
     if clicked then latest = model:view(); end
     local hp_color = ResourceStyle.hp_color(member.hp_percent / 100, config.thresholds.warning_hp, config.thresholds.critical_hp);
@@ -446,15 +543,22 @@ function AshitaShell.render(model, now, callbacks)
     if not config.ui.visible then return {}, nil, false; end
 
     local groups = visible_member_groups(view.members, config);
+    local compact_idle = config.ui.debuff_alert_mode and #groups == 0;
+    if compact_idle and not config.ui.debuff_alert_preview then
+        -- The alert panel keeps its saved coordinates but creates no ImGui window until an actionable remedy exists.
+        local settings_changed = render_settings_window(imgui, model, callbacks) or false;
+        return model:drain_audit(), nil, settings_changed;
+    end
     local layout_signature = grid_layout_signature(config, groups);
     if main_layout_signature ~= layout_signature then
         main_layout_signature = layout_signature;
         window_initialized.main = false;
     end
-    set_window_alpha(imgui, config.ui.background_alpha);
-    local background_pushed = push_window_background(imgui, config.ui.background_alpha);
+    local effective_alpha = config.ui.xiui_style and math.min(config.ui.background_alpha, 0.10) or config.ui.background_alpha;
+    set_window_alpha(imgui, effective_alpha);
+    local background_pushed = push_window_background(imgui, effective_alpha);
     initialize_window(imgui, 'main', config.ui.x, config.ui.y, grid_window_width(config, groups), config.ui.height);
-    local titlebar_flag = config.ui.minimal_mode and _G.ImGuiWindowFlags_NoTitleBar or nil;
+    local titlebar_flag = (config.ui.minimal_mode or config.ui.debuff_alert_mode) and _G.ImGuiWindowFlags_NoTitleBar or nil;
     local open;
     if titlebar_flag then open = imgui.Begin('PartyCare##grid', true, titlebar_flag); else open = imgui.Begin('PartyCare##grid'); end
     if open then
@@ -462,7 +566,7 @@ function AshitaShell.render(model, now, callbacks)
         changed = capture_size(model, imgui) or changed;
         view = model:view(); config = view.config;
         set_font_scale(imgui, config.ui.font_scale);
-        if not config.ui.minimal_mode then
+        if not config.ui.minimal_mode and not config.ui.debuff_alert_mode then
             if imgui.Button(config.ui.settings_open and 'Close Settings' or 'Settings', {-1, 0}) then
                 mutate(model, function(candidate) candidate.ui.settings_open = not candidate.ui.settings_open; end);
                 if not config.ui.settings_open then settings_tab = 'general'; end
@@ -474,6 +578,10 @@ function AshitaShell.render(model, now, callbacks)
         end
 
         groups = visible_member_groups(view.members, config);
+        if config.ui.debuff_alert_mode and #groups == 0 then
+            -- Preview remains content-free: it exists solely to reposition the hidden alert panel.
+            dummy(imgui, math.max(20, config.ui.card_width), 18);
+        end
         for group_index, group in ipairs(groups) do
             if #groups > 1 then
                 if group_index > 1 then imgui.Separator(); end
@@ -481,10 +589,10 @@ function AshitaShell.render(model, now, callbacks)
             end
             for index, member in ipairs(group.members) do
                 render_member_card(imgui, model, member, now, config);
-                if index % config.ui.grid_columns ~= 0 and index < #group.members then imgui.SameLine(); end
+                if not config.ui.xiui_style and index % config.ui.grid_columns ~= 0 and index < #group.members then imgui.SameLine(); end
             end
         end
-        if not config.ui.minimal_mode then imgui.TextDisabled('By: Schmeee'); end
+        if not config.ui.minimal_mode and not config.ui.debuff_alert_mode then imgui.TextDisabled('By: Schmeee'); end
 
     end
     imgui.End();

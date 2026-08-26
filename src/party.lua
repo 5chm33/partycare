@@ -38,6 +38,20 @@ function Party.normalize_member(raw, position)
         end
     end
 
+    local debuff_labels = {};
+    if type(raw.debuff_labels) == 'table' then
+        for rule_id, label in pairs(raw.debuff_labels) do
+            if Util.is_nonempty_string(rule_id) and Util.is_nonempty_string(label) then debuff_labels[rule_id] = label; end
+        end
+    end
+
+    local spell_availability = {};
+    if type(raw.spell_availability) == 'table' then
+        for spell, known in pairs(raw.spell_availability) do
+            if Util.is_nonempty_string(spell) and type(known) == 'boolean' then spell_availability[spell] = known; end
+        end
+    end
+
     local normalized = {
         id = raw.id,
         name = raw.name,
@@ -51,9 +65,13 @@ function Party.normalize_member(raw, position)
         active = raw.active ~= false,
         status = type(raw.status) == 'string' and raw.status or '',
         debuffs = debuffs,
+        debuff_labels = debuff_labels,
         status_feed_available = raw.status_feed_available == true,
         status_icon_count = Util.is_integer(raw.status_icon_count) and math.max(0, raw.status_icon_count) or 0,
         status_source = type(raw.status_source) == 'string' and raw.status_source or '',
+        has_refresh = raw.has_refresh == true,
+        refresh_known = raw.refresh_known == true,
+        spell_availability = spell_availability,
     };
     normalized.hp_percent = normalized.hp / normalized.hp_max * 100;
     normalized.mp_percent = normalized.mp_max == 0 and 0 or normalized.mp / normalized.mp_max * 100;
@@ -90,12 +108,16 @@ function Party.severity(member, thresholds)
     return 'healthy';
 end
 
-function Party.decorate_members(members, thresholds)
+function Party.decorate_members(members, thresholds, ui)
     local decorated = {};
     for index, member in ipairs(members) do
         decorated[index] = Util.copy(member);
         decorated[index].severity = Party.severity(member, thresholds);
         decorated[index].needs_attention = decorated[index].severity == 'warning' or decorated[index].severity == 'critical';
+        decorated[index].refresh_missing = ui and ui.refresh_pulse_enabled == true
+            and decorated[index].refresh_known == true
+            and decorated[index].has_refresh ~= true
+            and decorated[index].mp > (ui.refresh_min_mp or 150);
     end
     return decorated;
 end

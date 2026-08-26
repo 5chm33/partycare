@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 16,
+    version = 19,
     ui = {
         visible = true,
         locked = false,
@@ -22,6 +22,11 @@ return {
         minimal_mode = true,
         adaptive_scale = true,
         font_scale = 1.00,
+        xiui_style = false,
+        debuff_alert_mode = false, -- Show only members with an enabled remedy recommendation.
+        debuff_alert_preview = false, -- Show the otherwise hidden compact box only while positioning it.
+        refresh_pulse_enabled = false, -- Pulse names above the threshold without the Refresh icon.
+        refresh_min_mp = 150,
         show_mp = true,
         show_status = true,
         show_action_bar = false,
@@ -50,6 +55,8 @@ return {
         poison = {spell = 'Poisona', enabled = true, priority = 50},
 
         -- Erase removes one enabled matching effect per deliberate Remedy click.
+        -- If Ashita reports that Erase is unlearned, PartyCare skips these rules and
+        -- falls through to the next learned configured remedy (for example, Poisona).
         gravity = {spell = 'Erase', enabled = true, priority = 90},
         bind = {spell = 'Erase', enabled = true, priority = 89},
         slow = {spell = 'Erase', enabled = true, priority = 85},
