@@ -117,7 +117,7 @@ function Party.decorate_members(members, thresholds, ui)
         decorated[index].refresh_missing = ui and ui.refresh_pulse_enabled == true
             and decorated[index].refresh_known == true
             and decorated[index].has_refresh ~= true
-            and decorated[index].mp > (ui.refresh_min_mp or 150);
+            and decorated[index].mp_max > (ui.refresh_min_mp or 150);
     end
     return decorated;
 end

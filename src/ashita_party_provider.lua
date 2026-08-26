@@ -186,6 +186,7 @@ function Provider.snapshot(remedy_rules)
     if not memory then return nil, 'Ashita party memory manager is unavailable'; end
     local party = call(memory, 'GetParty');
     if not party then return nil, 'Ashita party interface is unavailable'; end
+    local party_raw = call(party, 'GetRawStructure');
 
     local spell_availability = Spellbook.availability(memory, remedy_rules);
     local memory_status_by_server_id = local_statuses_by_server_id(party);
@@ -214,13 +215,14 @@ function Provider.snapshot(remedy_rules)
                     -- Level Sync updates, which previously produced party-wide false
                     -- `Slow` / `Erase` recommendations.
                     local packet_statuses = PartyStatusCache.get(server_id);
+                    local memory_status = memory_status_by_server_id[server_id];
                     if packet_statuses then
                         debuffs, status_meta = merge_status_sources({{
                             name = 'party_status_packet',
                             values = packet_statuses,
                         }});
                         has_refresh, refresh_known = has_status_icon(packet_statuses, REFRESH_STATUS_ID);
-                    elseif memory_status_by_server_id[server_id] then
+                    elseif memory_status then
                         -- A 0x076 packet is not guaranteed to arrive immediately after
                         -- PartyCare loads.  Use the normal memory record for direct,
                         -- well-understood effects such as Poison.  Treat grouped or
@@ -228,22 +230,36 @@ function Provider.snapshot(remedy_rules)
                         -- HorizonXI can expose transient values for them during sync.
                         -- Keep a single Slow, but suppress a simultaneous multi-member
                         -- Slow burst until an authoritative packet replaces it.
-                        debuffs = filter_fallback_debuffs(memory_status_by_server_id[server_id].debuffs, fallback_slow_allowed);
-                        status_meta = memory_status_by_server_id[server_id].meta;
+                        debuffs = filter_fallback_debuffs(memory_status.debuffs, fallback_slow_allowed);
+                        status_meta = memory_status.meta;
                         status_meta = {
                             available = status_meta.available,
                             observed = status_meta.observed,
                             source = status_meta.source .. ' (guarded memory fallback)',
                         };
-                        has_refresh = memory_status_by_server_id[server_id].has_refresh == true;
-                        refresh_known = memory_status_by_server_id[server_id].refresh_known == true;
+                        has_refresh = memory_status.has_refresh == true;
+                        refresh_known = memory_status.refresh_known == true;
+                    end
+                    -- Packet 0x076 status snapshots are authoritative for remedy
+                    -- decisions but can remain unchanged through a short-lived
+                    -- Refresh expiration. Use the live party icon record for the
+                    -- refresh alert whenever it is currently readable.
+                    if memory_status and memory_status.refresh_known == true then
+                        has_refresh = memory_status.has_refresh == true;
+                        refresh_known = true;
                     end
                 end
             end
             local hp_percent = tonumber(call(party, 'GetMemberHPPercent', slot)) or 0;
             local mp_percent = tonumber(call(party, 'GetMemberMPPercent', slot)) or 0;
             local current_mp = tonumber(call(party, 'GetMemberMP', slot)) or 0;
-            local estimated_mp_max = mp_percent > 0 and math.max(current_mp, math.floor(current_mp * 100 / mp_percent + 0.5)) or math.max(current_mp, 1);
+            local raw_member = type(party_raw) == 'table' and type(party_raw.Members) == 'table' and party_raw.Members[slot + 1] or nil;
+            local actual_mp_max = tonumber(type(raw_member) == 'table' and raw_member.MPMax or nil);
+            -- IParty exposes a member's current MP but its public record does
+            -- not consistently expose a maximum. A percentage-derived maximum
+            -- is used only when a direct raw maximum is unavailable.
+            local estimated_mp_max = actual_mp_max and math.max(actual_mp_max, current_mp)
+                or (mp_percent > 0 and math.max(current_mp, math.floor(current_mp * 100 / mp_percent + 0.5)) or math.max(current_mp, 1));
             table.insert(members, {
                 id = server_id,
                 party_slot = slot,

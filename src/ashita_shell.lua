@@ -387,7 +387,11 @@ end
 local function grid_layout_signature(config, groups)
     local counts = {};
     for _, group in ipairs(groups or {}) do table.insert(counts, tostring(#group.members)); end
-    return table.concat({tostring(config.ui.full_alliance_preview), tostring(config.ui.xiui_style), tostring(config.ui.debuff_alert_mode), tostring(config.ui.grid_columns), tostring(config.ui.card_width), table.concat(counts, ',')}, '|');
+    -- While adaptive scaling is enabled, card width changes continuously as the
+    -- user drags the ImGui resize corner. Do not treat those live measurements
+    -- as a layout change that reinitializes the window to its prior size.
+    local width_signature = config.ui.adaptive_scale and 'live_resize' or tostring(config.ui.card_width);
+    return table.concat({tostring(config.ui.full_alliance_preview), tostring(config.ui.xiui_style), tostring(config.ui.debuff_alert_mode), tostring(config.ui.grid_columns), width_signature, table.concat(counts, ',')}, '|');
 end
 
 local function preview_member(slot)

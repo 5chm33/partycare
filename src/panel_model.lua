@@ -7,6 +7,28 @@ local Remedies = require('src.remedies');
 local PanelModel = {};
 PanelModel.__index = PanelModel;
 
+local function apply_refresh_continuity(members, previous_refresh)
+    local next_refresh = {};
+    for _, member in ipairs(members or {}) do
+        local key = tostring(member.id);
+        local prior = previous_refresh and previous_refresh[key] or nil;
+        if member.refresh_known == true then
+            next_refresh[key] = {has_refresh = member.has_refresh == true};
+        elseif prior and prior.has_refresh == false then
+            -- A transient unavailable feed must not clear an existing missing-
+            -- Refresh alert. It remains active until a later readable source
+            -- positively confirms the buff is present.
+            member.refresh_known = true;
+            member.has_refresh = false;
+            member.refresh_source = 'retained_missing_refresh';
+            next_refresh[key] = prior;
+        elseif prior then
+            next_refresh[key] = prior;
+        end
+    end
+    return next_refresh;
+end
+
 local function decorate_members(members, config)
     local decorated = Party.decorate_members(members, config.thresholds, config.ui);
     for _, member in ipairs(decorated) do
@@ -25,6 +47,7 @@ function PanelModel.new(raw_config)
     local self = setmetatable({}, PanelModel);
     self.config = config;
     self.members = {};
+    self.refresh_by_member_id = {};
     self.intent_state = Intents.new();
     self.revision = 0;
     return self, {};
@@ -126,6 +149,7 @@ end
 function PanelModel:update_members(raw_members)
     local members, errors = Party.normalize_members(raw_members);
     if not members then return false, errors; end
+    self.refresh_by_member_id = apply_refresh_continuity(members, self.refresh_by_member_id);
     self.members = decorate_members(members, self.config);
     if self.intent_state.selected_member_id ~= nil and not Party.find_member(self.members, self.intent_state.selected_member_id) then
         Intents.clear_selection(self.intent_state);
