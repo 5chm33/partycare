@@ -5,8 +5,9 @@ _G.AshitaCore = {
     GetResourceManager = function()
         return {
             GetSpellByName = function(_, name)
-                if name == 'Erase' then return {Id = 143}; end
-                if name == 'Poisona' then return {Id = 14}; end
+                if name == 'Erase' then return {Id = 143, LevelRequired = {[6] = 50}}; end
+                if name == 'Poisona' then return {Id = 14, LevelRequired = {[6] = 10}}; end
+                if name == 'Paralyna' then return {Id = 15, LevelRequired = {[6] = -1}}; end
                 return nil;
             end,
         };
@@ -18,14 +19,19 @@ local PanelModel = require('src.panel_model');
 
 local player = {
     HasSpellData = function() return 1; end,
-    HasSpell = function(_, id) return id ~= 143; end,
+    HasSpell = function() return true; end,
+    GetMainJob = function() return 5; end,
+    GetMainJobLevel = function() return 25; end,
+    GetSubJob = function() return 3; end,
+    GetSubJobLevel = function() return 12; end,
 };
 local memory = {GetPlayer = function() return player; end};
 local availability = Spellbook.availability(memory, {
-    slow = {spell = 'Erase'}, poison = {spell = 'Poisona'},
+    slow = {spell = 'Erase'}, poison = {spell = 'Poisona'}, paralyze = {spell = 'Paralyna'},
 });
-assert(availability.Erase == false, 'unlearned Erase was not recorded as unavailable');
+assert(availability.Erase == false, 'learned but level-locked Erase was not recorded as unavailable');
 assert(availability.Poisona == true, 'learned Poisona was not recorded as available');
+assert(availability.Paralyna == true, 'learned, level-usable WHM-sub Paralyna was incorrectly excluded by incomplete resource data');
 
 local model, errors = PanelModel.new();
 assert(model and #errors == 0, 'panel model initialization failed');
@@ -49,6 +55,10 @@ end
 local fake_player = {
     HasSpellData = function() return 1; end,
     HasSpell = function(_, id) return id ~= 143; end,
+    GetMainJob = function() return 5; end,
+    GetMainJobLevel = function() return 25; end,
+    GetSubJob = function() return 3; end,
+    GetSubJobLevel = function() return 12; end,
     GetStatusIcons = function() return icons(148); end,
     GetBuffs = function() return icons(148); end,
     GetRawStructure = function() return {StatusIcons = icons(148), Buffs = icons(148)}; end,
@@ -66,7 +76,7 @@ local fake_party = {
 };
 _G.AshitaCore = {
     GetMemoryManager = function() return {GetPlayer = function() return fake_player; end, GetParty = function() return fake_party; end}; end,
-    GetResourceManager = function() return {GetSpellByName = function(_, name) return name == 'Erase' and {Id = 143} or (name == 'Poisona' and {Id = 14} or nil); end}; end,
+    GetResourceManager = function() return {GetSpellByName = function(_, name) return name == 'Erase' and {Id = 143, LevelRequired = {[6] = 50}} or (name == 'Poisona' and {Id = 14, LevelRequired = {[6] = 10}} or nil); end}; end,
 };
 local Provider = require('src.ashita_party_provider');
 local snapshot, snapshot_error = Provider.snapshot({slow = {spell = 'Erase'}, poison = {spell = 'Poisona'}});
@@ -115,3 +125,31 @@ assert(max_mp_model:update_members({{
 assert(max_mp_model:view().members[1].refresh_missing == true, 'member above maximum-MP threshold did not pulse');
 
 print('Ashita spellbook and alert regression tests passed.');
+
+-- A readable remote memory record may be newer than the last 0x076 packet.
+-- Keep one genuine Slow, but continue suppressing the Level Sync multi-member burst.
+local merged_remote = Provider._test_merge_guarded_memory_fallback({'poison'}, {'slow'}, true);
+assert(#merged_remote == 2 and merged_remote[1] == 'poison' and merged_remote[2] == 'slow', 'single genuine remote Slow was hidden by older packet data');
+local suppressed_remote = Provider._test_merge_guarded_memory_fallback({'poison'}, {'slow'}, false);
+assert(#suppressed_remote == 1 and suppressed_remote[1] == 'poison', 'guarded fallback reintroduced a multi-member Level Sync Slow');
+
+print('Remote status precedence regression tests passed.');
+
+local early_model, early_errors = PanelModel.new();
+assert(early_model and #early_errors == 0, 'early Refresh model initialization failed');
+assert(early_model:update_config(function(config)
+    config.ui.refresh_pulse_enabled = true;
+    config.ui.refresh_min_mp = 150;
+    config.ui.refresh_early_pulse_enabled = true;
+    config.ui.refresh_duration_seconds = 150;
+    config.ui.refresh_early_seconds = 15;
+end));
+local refreshed_member = {{id = 7, name = 'Refresh Target', hp = 100, hp_max = 100, mp = 150, mp_max = 300, refresh_known = true, has_refresh = true}};
+assert(early_model:update_members(refreshed_member, 0));
+assert(early_model:view().members[1].refresh_missing == false, 'fresh Refresh started pulsing too early');
+assert(early_model:update_members(refreshed_member, 135));
+assert(early_model:view().members[1].refresh_missing == true and early_model:view().members[1].refresh_alert_kind == 'expiring', 'Refresh did not pulse at the configured 15-second lead');
+assert(early_model:update_members({{id = 7, name = 'Refresh Target', hp = 100, hp_max = 100, mp = 150, mp_max = 300, refresh_known = true, has_refresh = false}}, 150));
+assert(early_model:view().members[1].refresh_missing == true and early_model:view().members[1].refresh_alert_kind == 'missing', 'missing Refresh did not retain the fallback pulse');
+
+print('Early Refresh reminder regression tests passed.');

@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 19,
+    version = 23,
     ui = {
         visible = true,
         locked = false,
@@ -25,8 +25,19 @@ return {
         xiui_style = false,
         debuff_alert_mode = false, -- Show only members with an enabled remedy recommendation.
         debuff_alert_preview = false, -- Show the otherwise hidden compact box only while positioning it.
+        enemy_dispel_alert_mode = false, -- Manual Dispel button for the current party-engaged enemy, when Dispel is usable.
+        enemy_dispel_alert_preview = false, -- Show the otherwise hidden enemy alert box only while positioning it.
+        enemy_dispel_x = 320,
+        enemy_dispel_y = 180,
         refresh_pulse_enabled = false, -- Pulse names above the threshold without the Refresh icon.
         refresh_min_mp = 150,
+        refresh_early_pulse_enabled = true, -- Start a cue before an observed Refresh duration ends.
+        refresh_duration_seconds = 150,
+        refresh_early_seconds = 15,
+        haste_pulse_enabled = false, -- Enable optional Haste upkeep reminders when Haste is usable.
+        haste_early_pulse_enabled = true, -- Begin the Haste cue before an observed Haste duration ends.
+        haste_duration_seconds = 180,
+        haste_early_seconds = 15,
         show_mp = true,
         show_status = true,
         show_action_bar = false,
@@ -80,8 +91,8 @@ return {
         middle = {spell = 'Cure V', enabled = false},
         mouse4 = {spell = 'Cure III', enabled = false}, -- First mouse side button.
         mouse5 = {spell = 'Cure V', enabled = false}, -- Second mouse side button.
-        wheel_up = {spell = 'Regen', enabled = false}, -- Scroll upward while hovering a card.
-        wheel_down = {spell = 'Cure III', enabled = false}, -- Scroll downward while hovering a card.
+        wheel_up = {spell = 'Refresh', enabled = true}, -- Scroll upward while hovering a card.
+        wheel_down = {spell = 'Haste', enabled = true}, -- Scroll downward while hovering a card.
     },
     colors = {
         healthy = {0.15, 0.70, 0.35, 1.00},

@@ -8,7 +8,7 @@ do
     if ok and type(library_or_error) == 'table' then required_imgui = library_or_error; else required_imgui_error = library_or_error; end
 end
 
-local window_initialized = {main = false, settings = false};
+local window_initialized = {main = false, settings = false, enemy = false};
 local main_layout_signature = nil;
 local edit_buffers = {};
 local settings_tab = 'general';
@@ -166,7 +166,7 @@ function AshitaShell.force_visible()
 end
 
 function AshitaShell.reset_window_positions()
-    window_initialized = {main = false, settings = false};
+    window_initialized = {main = false, settings = false, enemy = false};
     main_layout_signature = nil;
     edit_buffers = {};
     settings_tab = 'general';
@@ -185,9 +185,9 @@ local function hovered_wheel_direction(imgui)
     return nil;
 end
 
-local function member_click(imgui, model, member, now, width, height, pulse_refresh, pulse_alert)
+local function member_click(imgui, model, member, now, width, height, upkeep_alert_kind, pulse_alert)
     local pushed_count = 0;
-    if (pulse_refresh or pulse_alert) and type(imgui.PushStyleColor) == 'function' and type(imgui.PopStyleColor) == 'function' then
+    if (upkeep_alert_kind or pulse_alert) and type(imgui.PushStyleColor) == 'function' and type(imgui.PopStyleColor) == 'function' then
         local pulse = (math.sin((tonumber(now) or 0) * 4.0) + 1) / 2;
         local button_color = rawget(_G, 'ImGuiCol_Button');
         local hover_color = rawget(_G, 'ImGuiCol_ButtonHovered');
@@ -198,11 +198,31 @@ local function member_click(imgui, model, member, now, width, height, pulse_refr
             if hover_color then imgui.PushStyleColor(hover_color, {0.96, 0.16, 0.12, 1.00}); pushed_count = pushed_count + 1; end
             if active_color then imgui.PushStyleColor(active_color, {0.35, 0.01, 0.01, 1.00}); pushed_count = pushed_count + 1; end
             if text_color then imgui.PushStyleColor(text_color, {1.00, 0.18 + pulse * 0.20, 0.18 + pulse * 0.10, 1.00}); pushed_count = pushed_count + 1; end
+        elseif upkeep_alert_kind == 'expiring' then
+            -- Refresh has visual priority: its final 15-second cue is purple.
+            if button_color then imgui.PushStyleColor(button_color, {0.18 + pulse * 0.26, 0.08 + pulse * 0.08, 0.42 + pulse * 0.34, 0.88 + pulse * 0.12}); pushed_count = pushed_count + 1; end
+            if hover_color then imgui.PushStyleColor(hover_color, {0.42, 0.24, 0.72, 1.00}); pushed_count = pushed_count + 1; end
+            if active_color then imgui.PushStyleColor(active_color, {0.16, 0.06, 0.34, 1.00}); pushed_count = pushed_count + 1; end
+            if text_color then imgui.PushStyleColor(text_color, {0.94, 0.80 + pulse * 0.20, 1.00, 1.00}); pushed_count = pushed_count + 1; end
+        elseif upkeep_alert_kind == 'haste_expiring' then
+            -- Haste is visible only after the Refresh cue is clear; use yellow.
+            if button_color then imgui.PushStyleColor(button_color, {0.48 + pulse * 0.38, 0.30 + pulse * 0.32, 0.03, 0.86 + pulse * 0.14}); pushed_count = pushed_count + 1; end
+            if hover_color then imgui.PushStyleColor(hover_color, {0.98, 0.78, 0.12, 1.00}); pushed_count = pushed_count + 1; end
+            if active_color then imgui.PushStyleColor(active_color, {0.50, 0.31, 0.01, 1.00}); pushed_count = pushed_count + 1; end
+            if text_color then imgui.PushStyleColor(text_color, {1.00, 0.96, 0.70 + pulse * 0.30, 1.00}); pushed_count = pushed_count + 1; end
+        elseif upkeep_alert_kind == 'haste_missing' then
+            -- Confirmed missing Haste remains solid yellow until observed active.
+            if button_color then imgui.PushStyleColor(button_color, {0.62, 0.42, 0.05, 0.96}); pushed_count = pushed_count + 1; end
+            if hover_color then imgui.PushStyleColor(hover_color, {0.82, 0.60, 0.08, 1.00}); pushed_count = pushed_count + 1; end
+            if active_color then imgui.PushStyleColor(active_color, {0.40, 0.25, 0.01, 1.00}); pushed_count = pushed_count + 1; end
+            if text_color then imgui.PushStyleColor(text_color, {1.00, 0.92, 0.60, 1.00}); pushed_count = pushed_count + 1; end
         else
-            if button_color then imgui.PushStyleColor(button_color, {0.16 + pulse * 0.22, 0.18, 0.42 + pulse * 0.28, 0.92}); pushed_count = pushed_count + 1; end
-            if hover_color then imgui.PushStyleColor(hover_color, {0.28, 0.24, 0.62, 1.00}); pushed_count = pushed_count + 1; end
-            if active_color then imgui.PushStyleColor(active_color, {0.12, 0.12, 0.30, 1.00}); pushed_count = pushed_count + 1; end
-            if text_color then imgui.PushStyleColor(text_color, {0.72 + pulse * 0.28, 0.72 + pulse * 0.28, 0.18 + pulse * 0.22, 1.00}); pushed_count = pushed_count + 1; end
+            -- Refresh is confirmed absent: a solid, darker purple stays visible
+            -- until an observed reapplication clears the state.
+            if button_color then imgui.PushStyleColor(button_color, {0.19, 0.08, 0.32, 0.96}); pushed_count = pushed_count + 1; end
+            if hover_color then imgui.PushStyleColor(hover_color, {0.29, 0.13, 0.48, 1.00}); pushed_count = pushed_count + 1; end
+            if active_color then imgui.PushStyleColor(active_color, {0.12, 0.04, 0.22, 1.00}); pushed_count = pushed_count + 1; end
+            if text_color then imgui.PushStyleColor(text_color, {0.84, 0.70, 0.98, 1.00}); pushed_count = pushed_count + 1; end
         end
     end
     local pressed = imgui.Button(member_label(member, tostring(model:view().selected_member_id) == tostring(member.id)) .. '##member_' .. tostring(member.id), {width, height});
@@ -255,12 +275,35 @@ local function render_general_tab(imgui, model, config)
     if toggle_button(imgui, 'Pulse Names Missing Refresh', config.ui.refresh_pulse_enabled, function(value) mutate(model, function(candidate) candidate.ui.refresh_pulse_enabled = value; end); end) then changed = true; end
     if config.ui.refresh_pulse_enabled then
         if stepper(imgui, 'Refresh Alert MP Threshold', config.ui.refresh_min_mp, 0, 9999, 25, function(value) mutate(model, function(candidate) candidate.ui.refresh_min_mp = value; end); end) then changed = true; end
-        imgui.TextDisabled('Pulses only for members above this maximum MP without a confirmed Refresh icon.');
+        if toggle_button(imgui, 'Pulse 15 Seconds Before Refresh Expires', config.ui.refresh_early_pulse_enabled, function(value) mutate(model, function(candidate) candidate.ui.refresh_early_pulse_enabled = value; end); end) then changed = true; end
+        if config.ui.refresh_early_pulse_enabled then
+            if stepper(imgui, 'Observed Refresh Duration', config.ui.refresh_duration_seconds, 30, 900, 5, function(value) mutate(model, function(candidate) candidate.ui.refresh_duration_seconds = value; end); end) then changed = true; end
+            if stepper(imgui, 'Early Refresh Lead Time', config.ui.refresh_early_seconds, 1, math.max(1, config.ui.refresh_duration_seconds - 1), 1, function(value) mutate(model, function(candidate) candidate.ui.refresh_early_seconds = value; end); end) then changed = true; end
+            imgui.TextDisabled('Starts when PartyCare first observes Refresh; missing-Refresh remains the fallback.');
+        else
+            imgui.TextDisabled('Pulses only for members above this maximum MP without a confirmed Refresh icon.');
+        end
     end
     if toggle_button(imgui, 'Compact Debuff Alert Mode', config.ui.debuff_alert_mode, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_mode = value; candidate.ui.debuff_alert_preview = value; end); window_initialized.main = false; end) then changed = true; end
+    if toggle_button(imgui, 'Pulse Names Missing Haste', config.ui.haste_pulse_enabled, function(value) mutate(model, function(candidate) candidate.ui.haste_pulse_enabled = value; end); end) then changed = true; end
+    if config.ui.haste_pulse_enabled then
+        if toggle_button(imgui, 'Pulse 15 Seconds Before Haste Expires', config.ui.haste_early_pulse_enabled, function(value) mutate(model, function(candidate) candidate.ui.haste_early_pulse_enabled = value; end); end) then changed = true; end
+        if config.ui.haste_early_pulse_enabled then
+            if stepper(imgui, 'Observed Haste Duration', config.ui.haste_duration_seconds, 30, 900, 5, function(value) mutate(model, function(candidate) candidate.ui.haste_duration_seconds = value; end); end) then changed = true; end
+            if stepper(imgui, 'Early Haste Lead Time', config.ui.haste_early_seconds, 1, math.max(1, config.ui.haste_duration_seconds - 1), 1, function(value) mutate(model, function(candidate) candidate.ui.haste_early_seconds = value; end); end) then changed = true; end
+            imgui.TextDisabled('Haste is yellow and appears only after the higher-priority Refresh cue is clear.');
+        else
+            imgui.TextDisabled('Shows solid yellow only when Haste is confirmed absent and usable.');
+        end
+    end
     if config.ui.debuff_alert_mode then
         if toggle_button(imgui, 'Show Compact Placement Preview', config.ui.debuff_alert_preview, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_preview = value; end); window_initialized.main = false; end) then changed = true; end
         imgui.TextDisabled('Idle alerts are fully hidden. Turn preview on only to position the compact alert box.');
+    end
+    if toggle_button(imgui, 'Enemy Dispel Compact Alert', config.ui.enemy_dispel_alert_mode, function(value) mutate(model, function(candidate) candidate.ui.enemy_dispel_alert_mode = value; candidate.ui.enemy_dispel_alert_preview = value; end); window_initialized.enemy = false; end) then changed = true; end
+    if config.ui.enemy_dispel_alert_mode then
+        if toggle_button(imgui, 'Show Enemy Dispel Placement Preview', config.ui.enemy_dispel_alert_preview, function(value) mutate(model, function(candidate) candidate.ui.enemy_dispel_alert_preview = value; end); window_initialized.enemy = false; end) then changed = true; end
+        imgui.TextDisabled('Shows a party-engaged enemy when Dispel is usable; log-confirmed buffs are named. Select that enemy, then click manually.');
     end
     if toggle_button(imgui, 'Show MP Bar', config.ui.show_mp, function(value) mutate(model, function(candidate) candidate.ui.show_mp = value; end); end) then changed = true; end
     if toggle_button(imgui, 'Show Status Text', config.ui.show_status, function(value) mutate(model, function(candidate) candidate.ui.show_status = value; end); end) then changed = true; end
@@ -282,7 +325,7 @@ local function render_general_tab(imgui, model, config)
     if stepper(imgui, 'Critical HP', config.thresholds.critical_hp, 0, config.thresholds.warning_hp - 1, 5, function(value) mutate(model, function(candidate) candidate.thresholds.critical_hp = value; end); end) then changed = true; end
     imgui.Separator();
     if imgui.Button('Reset Both Windows') then model:reset_layout(); AshitaShell.reset_window_positions(); changed = true; end
-    imgui.TextDisabled('Drag either title bar to move it. Position saves automatically.');
+    imgui.TextDisabled('Drag a panel background to move it. Position saves automatically.');
     return changed;
 end
 
@@ -446,7 +489,7 @@ local function render_xiui_member_card(imgui, model, member, now, config)
         if hover_color then imgui.PushStyleColor(hover_color, {0.18, 0.39, 0.55, 0.98}); pushed_count = pushed_count + 1; end
         if active_color then imgui.PushStyleColor(active_color, {0.08, 0.20, 0.30, 1.00}); pushed_count = pushed_count + 1; end
     end
-    member_click(imgui, model, member, now, card_width, 18, member.refresh_missing);
+    member_click(imgui, model, member, now, card_width, 18, member.upkeep_alert_kind);
     if pushed_count > 0 then imgui.PopStyleColor(pushed_count); end
 
     local hp_color = ResourceStyle.hp_color(member.hp_percent / 100, config.thresholds.warning_hp, config.thresholds.critical_hp);
@@ -501,7 +544,7 @@ local function render_member_card(imgui, model, member, now, config)
     if config.ui.xiui_style then return render_xiui_member_card(imgui, model, member, now, config); end
     local card_width = config.ui.card_width;
     local group_open = begin_group(imgui);
-    local clicked = member_click(imgui, model, member, now, card_width, config.ui.member_height, member.refresh_missing);
+    local clicked = member_click(imgui, model, member, now, card_width, config.ui.member_height, member.upkeep_alert_kind);
     local latest = model:view();
     if clicked then latest = model:view(); end
     local hp_color = ResourceStyle.hp_color(member.hp_percent / 100, config.thresholds.warning_hp, config.thresholds.critical_hp);
@@ -534,6 +577,38 @@ local function render_member_card(imgui, model, member, now, config)
     end_group(imgui, group_open);
 end
 
+local function render_enemy_dispel_alert(imgui, model, now, config, enemy)
+    if config.ui.enemy_dispel_alert_mode ~= true then return false; end
+    local actionable = type(enemy) == 'table' and enemy.action_available == true;
+    if not actionable and config.ui.enemy_dispel_alert_preview ~= true then return false; end
+
+    local changed = false;
+    local alpha = math.min(config.ui.background_alpha, 0.20);
+    set_window_alpha(imgui, alpha);
+    local background_pushed = push_window_background(imgui, alpha);
+    initialize_window(imgui, 'enemy', config.ui.enemy_dispel_x, config.ui.enemy_dispel_y, config.ui.card_width, 40);
+    local open = imgui.Begin('Enemy Dispel##partycare_enemy_dispel', true, _G.ImGuiWindowFlags_NoTitleBar);
+    if open then
+        if not config.ui.locked then changed = capture_position(model, 'capture_enemy_window_position', imgui) or changed; end
+        if actionable then
+            local detail = enemy.detected_effect and (' (' .. enemy.detected_effect .. ')') or '';
+            local label = 'Dispel: ' .. enemy.name .. detail .. '##enemy_dispel_' .. tostring(enemy.id);
+            if pulsing_remedy_button(imgui, label, {config.ui.card_width, 20}, now) then
+                model:request_enemy_dispel(now);
+            end
+            if type(imgui.IsItemHovered) == 'function' and imgui.IsItemHovered() and type(imgui.SetTooltip) == 'function' then
+                imgui.SetTooltip('Select this enemy, then click for a manual Dispel. PartyCare never retargets or casts automatically.');
+            end
+        else
+            -- Placement preview is deliberately content-free while idle.
+            dummy(imgui, config.ui.card_width, 18);
+        end
+    end
+    imgui.End();
+    if background_pushed then imgui.PopStyleColor(1); end
+    return changed;
+end
+
 function AshitaShell.render(model, now, callbacks)
     local ready, reason = AshitaShell.visibility_status();
     if not ready then return nil, reason, false; end
@@ -549,9 +624,11 @@ function AshitaShell.render(model, now, callbacks)
     local groups = visible_member_groups(view.members, config);
     local compact_idle = config.ui.debuff_alert_mode and #groups == 0;
     if compact_idle and not config.ui.debuff_alert_preview then
-        -- The alert panel keeps its saved coordinates but creates no ImGui window until an actionable remedy exists.
+        -- Party compact mode stays hidden, but the independent enemy compact
+        -- panel can still appear for a log-confirmed battle enemy.
+        local enemy_changed = render_enemy_dispel_alert(imgui, model, now, config, view.enemy) or false;
         local settings_changed = render_settings_window(imgui, model, callbacks) or false;
-        return model:drain_audit(), nil, settings_changed;
+        return model:drain_audit(), nil, enemy_changed or settings_changed;
     end
     local layout_signature = grid_layout_signature(config, groups);
     if main_layout_signature ~= layout_signature then
@@ -601,6 +678,8 @@ function AshitaShell.render(model, now, callbacks)
     end
     imgui.End();
     if background_pushed then imgui.PopStyleColor(1); end
+    view = model:view(); config = view.config;
+    changed = render_enemy_dispel_alert(imgui, model, now, config, view.enemy) or changed;
     changed = render_settings_window(imgui, model, callbacks) or changed;
     return model:drain_audit(), nil, changed;
 end

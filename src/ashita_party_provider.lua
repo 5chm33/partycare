@@ -36,6 +36,7 @@ local function alliance_group(slot)
 end
 
 local REFRESH_STATUS_ID = 43;
+local HASTE_STATUS_ID = 33;
 
 local function has_status_icon(icons, wanted_status_id)
     if icons == nil then return false, false; end
@@ -97,7 +98,8 @@ local function local_statuses_by_server_id(party)
             local icons = call(party, 'GetStatusIcons', record_index);
             local debuffs, meta = merge_status_sources({{name = 'party_status_icons', values = icons}});
             local has_refresh, refresh_known = has_status_icon(icons, REFRESH_STATUS_ID);
-            records[server_id] = {debuffs = debuffs, meta = meta, has_refresh = has_refresh, refresh_known = refresh_known};
+            local has_haste, haste_known = has_status_icon(icons, HASTE_STATUS_ID);
+            records[server_id] = {debuffs = debuffs, meta = meta, has_refresh = has_refresh, refresh_known = refresh_known, has_haste = has_haste, haste_known = haste_known};
         end
     end
 
@@ -109,7 +111,8 @@ local function local_statuses_by_server_id(party)
             if server_id and server_id > 0 and not records[server_id] then
                 local debuffs, meta = merge_status_sources({{name = 'party_status_raw', values = member.StatusIcons}});
                 local has_refresh, refresh_known = has_status_icon(member.StatusIcons, REFRESH_STATUS_ID);
-                records[server_id] = {debuffs = debuffs, meta = meta, has_refresh = has_refresh, refresh_known = refresh_known};
+                local has_haste, haste_known = has_status_icon(member.StatusIcons, HASTE_STATUS_ID);
+                records[server_id] = {debuffs = debuffs, meta = meta, has_refresh = has_refresh, refresh_known = refresh_known, has_haste = has_haste, haste_known = haste_known};
             end
         end
     end
@@ -142,6 +145,18 @@ local function filter_fallback_debuffs(debuffs, allow_slow)
     return result;
 end
 
+local function merge_guarded_memory_fallback(packet_debuffs, memory_debuffs, allow_slow)
+    local merged, seen = {}, {};
+    for _, rule_id in ipairs(packet_debuffs or {}) do
+        if not seen[rule_id] then table.insert(merged, rule_id); seen[rule_id] = true; end
+    end
+    for _, rule_id in ipairs(filter_fallback_debuffs(memory_debuffs, allow_slow)) do
+        if not seen[rule_id] then table.insert(merged, rule_id); seen[rule_id] = true; end
+    end
+    table.sort(merged);
+    return merged;
+end
+
 local function local_player_statuses(memory)
     local player = call(memory, 'GetPlayer');
     local raw = call(player, 'GetRawStructure');
@@ -153,7 +168,7 @@ local function local_player_statuses(memory)
     });
 end
 
-local function local_player_refresh(memory)
+local function local_player_status(memory, wanted_status_id)
     local player = call(memory, 'GetPlayer');
     local raw = call(player, 'GetRawStructure');
     local sources = {
@@ -163,10 +178,10 @@ local function local_player_refresh(memory)
     };
     local known = false;
     for index = 1, 4 do
-        local has_refresh, available = has_status_icon(sources[index], REFRESH_STATUS_ID);
+        local has_status, available = has_status_icon(sources[index], wanted_status_id);
         if available then
             known = true;
-            if has_refresh then return true, true; end
+            if has_status then return true, true; end
         end
     end
     return false, known;
@@ -176,6 +191,9 @@ local function memory_manager()
     if AshitaCore == nil then return nil; end
     return call(AshitaCore, 'GetMemoryManager');
 end
+
+-- Exposed only for deterministic regression coverage of remote packet/memory precedence.
+Provider._test_merge_guarded_memory_fallback = merge_guarded_memory_fallback;
 
 function Provider.available()
     return memory_manager() ~= nil;
@@ -188,14 +206,21 @@ function Provider.snapshot(remedy_rules)
     if not party then return nil, 'Ashita party interface is unavailable'; end
     local party_raw = call(party, 'GetRawStructure');
 
-    local spell_availability = Spellbook.availability(memory, remedy_rules);
+    -- Haste is an optional upkeep alert rather than a remedy rule, but it uses
+    -- the exact same learned-and-currently-usable spell gate.
+    local availability_rules = {};
+    for key, rule in pairs(remedy_rules or {}) do availability_rules[key] = rule; end
+    availability_rules.haste_alert = {spell = 'Haste'};
+    availability_rules.refresh_alert = {spell = 'Refresh'};
+    local spell_availability = Spellbook.availability(memory, availability_rules);
     local memory_status_by_server_id = local_statuses_by_server_id(party);
     -- A Level Sync transition can write the same stale Slow value to several
     -- remote records.  A single fallback Slow is useful; a multi-member burst
     -- is treated as transitional until an authoritative packet replaces it.
     local fallback_slow_allowed = count_rule(memory_status_by_server_id, 'slow') == 1;
     local self_statuses, self_meta = local_player_statuses(memory);
-    local self_has_refresh, self_refresh_known = local_player_refresh(memory);
+    local self_has_refresh, self_refresh_known = local_player_status(memory, REFRESH_STATUS_ID);
+    local self_has_haste, self_haste_known = local_player_status(memory, HASTE_STATUS_ID);
     local members = {};
     for slot = 0, 17 do
         local active = call(party, 'GetMemberIsActive', slot);
@@ -205,10 +230,12 @@ function Provider.snapshot(remedy_rules)
             local server_id = tonumber(call(party, 'GetMemberServerId', slot)) or slot;
             local debuffs, status_meta = {}, {available = false, observed = 0, source = ''};
             local has_refresh, refresh_known = false, false;
+            local has_haste, haste_known = false, false;
             if group == 1 then
                 if slot == 0 then
                     debuffs, status_meta = self_statuses, self_meta;
                     has_refresh, refresh_known = self_has_refresh, self_refresh_known;
+                    has_haste, haste_known = self_has_haste, self_haste_known;
                 else
                     -- Remote party status icons are packet-backed.  The client-memory
                     -- records can temporarily retain or misassociate values while
@@ -222,6 +249,19 @@ function Provider.snapshot(remedy_rules)
                             values = packet_statuses,
                         }});
                         has_refresh, refresh_known = has_status_icon(packet_statuses, REFRESH_STATUS_ID);
+                        has_haste, haste_known = has_status_icon(packet_statuses, HASTE_STATUS_ID);
+                        -- A packet can be older than the currently readable party
+                        -- icon record. Merge only the guarded direct-effect fallback
+                        -- so a single genuine remote Slow is visible, while the
+                        -- multi-member Level Sync false-Slow burst stays suppressed.
+                        if memory_status then
+                            debuffs = merge_guarded_memory_fallback(debuffs, memory_status.debuffs, fallback_slow_allowed);
+                            status_meta = {
+                                available = status_meta.available or memory_status.meta.available,
+                                observed = status_meta.observed,
+                                source = status_meta.source .. ' + guarded memory fallback',
+                            };
+                        end
                     elseif memory_status then
                         -- A 0x076 packet is not guaranteed to arrive immediately after
                         -- PartyCare loads.  Use the normal memory record for direct,
@@ -239,6 +279,8 @@ function Provider.snapshot(remedy_rules)
                         };
                         has_refresh = memory_status.has_refresh == true;
                         refresh_known = memory_status.refresh_known == true;
+                        has_haste = memory_status.has_haste == true;
+                        haste_known = memory_status.haste_known == true;
                     end
                     -- Packet 0x076 status snapshots are authoritative for remedy
                     -- decisions but can remain unchanged through a short-lived
@@ -247,6 +289,10 @@ function Provider.snapshot(remedy_rules)
                     if memory_status and memory_status.refresh_known == true then
                         has_refresh = memory_status.has_refresh == true;
                         refresh_known = true;
+                    end
+                    if memory_status and memory_status.haste_known == true then
+                        has_haste = memory_status.has_haste == true;
+                        haste_known = true;
                     end
                 end
             end
@@ -273,6 +319,8 @@ function Provider.snapshot(remedy_rules)
                 status_source = status_meta.source,
                 has_refresh = has_refresh,
                 refresh_known = refresh_known,
+                has_haste = has_haste,
+                haste_known = haste_known,
                 spell_availability = spell_availability,
             });
         end

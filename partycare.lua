@@ -1,6 +1,6 @@
 addon.name = 'partycare';
 addon.author = 'Schmeee';
-addon.version = '1.2.11-xiui';
+addon.version = '1.2.29-xiui';
 addon.desc = 'Manual party and alliance healing and remedy panel for Ashita.';
 
 local Config = require('src.config');
@@ -9,6 +9,10 @@ local AshitaShell = require('src.ashita_shell');
 local SettingsStore = require('src.settings_store');
 local PartyProvider = require('src.ashita_party_provider');
 local PartyStatusCache = require('src.party_status_cache');
+local BattleEnemyTracker = require('src.battle_enemy_tracker');
+local RefreshCastTracker = require('src.refresh_cast_tracker');
+local EnemyLogTracker = require('src.enemy_log_tracker');
+local Timebase = require('src.timebase');
 local ManualDispatchAdapter = require('src.manual_dispatch_adapter');
 local Commands = require('src.commands');
 
@@ -21,6 +25,7 @@ local state = {
     last_render_error = nil,
     last_party_error = nil,
     dispatch_adapter = nil,
+    timebase = Timebase.new(),
 };
 
 local function chat(message)
@@ -61,8 +66,11 @@ local function update_members()
         return;
     end
     state.last_party_error = nil;
-    local updated, errors = state.model:update_members(members);
+    local updated, errors = state.model:update_members(members, state.now);
     if not updated then chat('Party data was rejected: ' .. table.concat(errors, '; ')); end
+    local enemy = BattleEnemyTracker.current();
+    local enemy_updated, enemy_errors = state.model:update_enemy(enemy);
+    if not enemy_updated then chat('Enemy target data was rejected: ' .. table.concat(enemy_errors or {}, '; ')); end
 end
 
 local function show_panel(open_settings)
@@ -143,9 +151,27 @@ ashita.events.register('packet_in', 'partycare_packet_in', function(e)
     if not e then return; end
     if e.id == 0x076 then
         PartyStatusCache.update(e);
+    elseif e.id == 0x0028 then
+        BattleEnemyTracker.handle_action_packet(e);
+        RefreshCastTracker.handle_packet(e, BattleEnemyTracker.party_ids(), state.now, function(kind, member_id, applied_at)
+            if not state.model then return; end
+            if kind == 'haste' then
+                state.model:mark_haste_reapplied(member_id, applied_at);
+            elseif kind == 'refresh' then
+                state.model:mark_refresh_reapplied(member_id, applied_at);
+            end
+        end);
+    elseif e.id == 0x00E then
+        BattleEnemyTracker.handle_mob_update_packet(e);
     elseif e.id == 0x00A or e.id == 0x00B then
         PartyStatusCache.clear();
+        BattleEnemyTracker.clear();
+        RefreshCastTracker.clear();
     end
+end);
+
+ashita.events.register('text_in', 'partycare_enemy_log', function(e)
+    EnemyLogTracker.handle_text(e);
 end);
 
 ashita.events.register('command', 'partycare_command', function(e)
@@ -157,7 +183,9 @@ end);
 
 ashita.events.register('d3d_present', 'partycare_draw', function()
     if not state.model then return; end
-    state.now = state.now + (1 / 60);
+    local elapsed, current_time = state.timebase:step();
+    state.now = current_time;
+    BattleEnemyTracker.update(elapsed);
     if state.now >= state.next_snapshot_at then state.next_snapshot_at = state.now + 0.20; update_members(); end
     local ok, audit, error_message, changed = pcall(AshitaShell.render, state.model, state.now, {on_save = function() return save_settings(); end});
     if not ok then
