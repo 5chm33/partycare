@@ -6,6 +6,10 @@ local PanelModel = require('src.panel_model');
 local model, errors = PanelModel.new(Config.DEFAULT);
 assert(model and #errors == 0, 'panel model initialization failed');
 assert(model:update_config(function(config)
+    config.ui.debuff_alert_mode = true;
+    config.ui.debuff_alert_preview = true;
+    config.ui.debuff_alert_x = 888;
+    config.ui.debuff_alert_y = 666;
     config.ui.enemy_dispel_alert_mode = true;
     config.ui.enemy_dispel_alert_preview = true;
     config.ui.enemy_dispel_x = 999;
@@ -18,6 +22,10 @@ assert(model:update_config(function(config)
 end));
 assert(model:reset_layout());
 local ui = model:view().config.ui;
+assert(ui.debuff_alert_mode == Config.DEFAULT.ui.debuff_alert_mode, 'compact debuff alert mode did not reset');
+assert(ui.debuff_alert_preview == Config.DEFAULT.ui.debuff_alert_preview, 'compact debuff preview did not reset');
+assert(ui.debuff_alert_x == Config.DEFAULT.ui.debuff_alert_x and ui.debuff_alert_y == Config.DEFAULT.ui.debuff_alert_y, 'compact debuff alert position did not reset');
+assert(ui.visible == true, 'layout reset unexpectedly hid the normal party panel');
 assert(ui.enemy_dispel_alert_mode == Config.DEFAULT.ui.enemy_dispel_alert_mode, 'enemy alert mode did not reset');
 assert(ui.enemy_dispel_alert_preview == Config.DEFAULT.ui.enemy_dispel_alert_preview, 'enemy preview did not reset');
 assert(ui.enemy_dispel_x == Config.DEFAULT.ui.enemy_dispel_x and ui.enemy_dispel_y == Config.DEFAULT.ui.enemy_dispel_y, 'enemy alert position did not reset');

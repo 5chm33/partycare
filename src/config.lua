@@ -1,7 +1,7 @@
 local Util = require('src.util');
 
 local Config = {};
-Config.VERSION = 23;
+Config.VERSION = 24;
 
 Config.DEFAULT = {
     version = Config.VERSION,
@@ -12,7 +12,7 @@ Config.DEFAULT = {
         layout = 'grid', grid_columns = 2, card_width = 200, card_height = 74,
         background_alpha = 0.28,
         minimal_mode = true, adaptive_scale = true, font_scale = 1.00, xiui_style = false,
-        debuff_alert_mode = false, debuff_alert_preview = false,
+        debuff_alert_mode = false, debuff_alert_preview = false, debuff_alert_x = 320, debuff_alert_y = 260,
         enemy_dispel_alert_mode = false, enemy_dispel_alert_preview = false, enemy_dispel_x = 320, enemy_dispel_y = 180,
         refresh_pulse_enabled = false, refresh_min_mp = 150,
         refresh_early_pulse_enabled = true, refresh_duration_seconds = 150, refresh_early_seconds = 15,
@@ -74,7 +74,7 @@ local UI_FIELDS = {
     visible = true, locked = true, settings_open = true, x = true, y = true, settings_x = true, settings_y = true,
     width = true, height = true, member_height = true, layout = true, grid_columns = true, card_width = true, card_height = true,
         background_alpha = true, minimal_mode = true, adaptive_scale = true, font_scale = true, xiui_style = true,
-        debuff_alert_mode = true, debuff_alert_preview = true, enemy_dispel_alert_mode = true, enemy_dispel_alert_preview = true, enemy_dispel_x = true, enemy_dispel_y = true, refresh_pulse_enabled = true, refresh_min_mp = true, refresh_early_pulse_enabled = true, refresh_duration_seconds = true, refresh_early_seconds = true, haste_pulse_enabled = true, haste_early_pulse_enabled = true, haste_duration_seconds = true, haste_early_seconds = true,
+        debuff_alert_mode = true, debuff_alert_preview = true, debuff_alert_x = true, debuff_alert_y = true, enemy_dispel_alert_mode = true, enemy_dispel_alert_preview = true, enemy_dispel_x = true, enemy_dispel_y = true, refresh_pulse_enabled = true, refresh_min_mp = true, refresh_early_pulse_enabled = true, refresh_duration_seconds = true, refresh_early_seconds = true, haste_pulse_enabled = true, haste_early_pulse_enabled = true, haste_duration_seconds = true, haste_early_seconds = true,
         show_mp = true, show_status = true, show_action_bar = true, show_remedy_button = true,
     show_alliance_2 = true, show_alliance_3 = true, full_alliance_preview = true,
 };
@@ -101,7 +101,7 @@ local function migrate(raw)
         local previous_version = raw.version;
         raw.version = Config.VERSION;
         raw.ui, raw.actions, raw.remedies, raw.review, raw.live_test, raw.direct_click = raw.ui or {}, raw.actions or {}, raw.remedies or {}, raw.review or {}, raw.live_test or {}, raw.direct_click or {};
-        for _, key in ipairs({'height', 'settings_open', 'settings_x', 'settings_y', 'layout', 'grid_columns', 'card_width', 'card_height', 'background_alpha', 'minimal_mode', 'adaptive_scale', 'font_scale', 'xiui_style', 'debuff_alert_mode', 'debuff_alert_preview', 'enemy_dispel_alert_mode', 'enemy_dispel_alert_preview', 'enemy_dispel_x', 'enemy_dispel_y', 'refresh_pulse_enabled', 'refresh_min_mp', 'refresh_early_pulse_enabled', 'refresh_duration_seconds', 'refresh_early_seconds', 'haste_pulse_enabled', 'haste_early_pulse_enabled', 'haste_duration_seconds', 'haste_early_seconds', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
+        for _, key in ipairs({'height', 'settings_open', 'settings_x', 'settings_y', 'layout', 'grid_columns', 'card_width', 'card_height', 'background_alpha', 'minimal_mode', 'adaptive_scale', 'font_scale', 'xiui_style', 'debuff_alert_mode', 'debuff_alert_preview', 'debuff_alert_x', 'debuff_alert_y', 'enemy_dispel_alert_mode', 'enemy_dispel_alert_preview', 'enemy_dispel_x', 'enemy_dispel_y', 'refresh_pulse_enabled', 'refresh_min_mp', 'refresh_early_pulse_enabled', 'refresh_duration_seconds', 'refresh_early_seconds', 'haste_pulse_enabled', 'haste_early_pulse_enabled', 'haste_duration_seconds', 'haste_early_seconds', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
             if raw.ui[key] == nil then raw.ui[key] = Config.DEFAULT.ui[key]; end
         end
         for key, default_action in pairs(Config.DEFAULT.actions) do
@@ -191,6 +191,11 @@ local function migrate(raw)
             raw.direct_click.wheel_up = Util.copy(Config.DEFAULT.direct_click.wheel_up);
             raw.direct_click.wheel_down = Util.copy(Config.DEFAULT.direct_click.wheel_down);
         end
+        if previous_version < 24 then
+            -- Compact debuff alerts now use an independent secondary window.
+            raw.ui.debuff_alert_x = Config.DEFAULT.ui.debuff_alert_x;
+            raw.ui.debuff_alert_y = Config.DEFAULT.ui.debuff_alert_y;
+        end
         for key, default_binding in pairs(Config.DEFAULT.direct_click) do
             if key ~= 'enabled' then raw.direct_click[key] = raw.direct_click[key] or Util.copy(default_binding); end
         end
@@ -236,7 +241,7 @@ function Config.validate(raw)
         for _, key in ipairs({'visible', 'locked', 'settings_open', 'minimal_mode', 'adaptive_scale', 'xiui_style', 'debuff_alert_mode', 'debuff_alert_preview', 'enemy_dispel_alert_mode', 'enemy_dispel_alert_preview', 'refresh_pulse_enabled', 'refresh_early_pulse_enabled', 'haste_pulse_enabled', 'haste_early_pulse_enabled', 'show_mp', 'show_status', 'show_action_bar', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
             if type(raw.ui[key]) == 'boolean' then result.ui[key] = raw.ui[key] else table.insert(errors, 'ui.' .. key .. ' must be boolean'); end
         end
-        for _, key in ipairs({'x', 'y', 'settings_x', 'settings_y', 'enemy_dispel_x', 'enemy_dispel_y'}) do
+        for _, key in ipairs({'x', 'y', 'settings_x', 'settings_y', 'debuff_alert_x', 'debuff_alert_y', 'enemy_dispel_x', 'enemy_dispel_y'}) do
             if Util.is_finite_number(raw.ui[key]) then result.ui[key] = raw.ui[key] else table.insert(errors, 'ui.' .. key .. ' must be finite'); end
         end
         for _, key in ipairs({'width', 'member_height', 'card_width', 'card_height'}) do

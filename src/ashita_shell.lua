@@ -166,7 +166,7 @@ function AshitaShell.force_visible()
 end
 
 function AshitaShell.reset_window_positions()
-    window_initialized = {main = false, settings = false, enemy = false};
+    window_initialized = {main = false, settings = false, debuff = false, enemy = false};
     main_layout_signature = nil;
     edit_buffers = {};
     settings_tab = 'general';
@@ -284,7 +284,7 @@ local function render_general_tab(imgui, model, config)
             imgui.TextDisabled('Pulses only for members above this maximum MP without a confirmed Refresh icon.');
         end
     end
-    if toggle_button(imgui, 'Compact Debuff Alert Mode', config.ui.debuff_alert_mode, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_mode = value; candidate.ui.debuff_alert_preview = value; end); window_initialized.main = false; end) then changed = true; end
+    if toggle_button(imgui, 'Compact Debuff Alert Mode', config.ui.debuff_alert_mode, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_mode = value; candidate.ui.debuff_alert_preview = value; end); window_initialized.debuff = false; end) then changed = true; end
     if toggle_button(imgui, 'Pulse Names Missing Haste', config.ui.haste_pulse_enabled, function(value) mutate(model, function(candidate) candidate.ui.haste_pulse_enabled = value; end); end) then changed = true; end
     if config.ui.haste_pulse_enabled then
         if toggle_button(imgui, 'Pulse 15 Seconds Before Haste Expires', config.ui.haste_early_pulse_enabled, function(value) mutate(model, function(candidate) candidate.ui.haste_early_pulse_enabled = value; end); end) then changed = true; end
@@ -297,8 +297,8 @@ local function render_general_tab(imgui, model, config)
         end
     end
     if config.ui.debuff_alert_mode then
-        if toggle_button(imgui, 'Show Compact Placement Preview', config.ui.debuff_alert_preview, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_preview = value; end); window_initialized.main = false; end) then changed = true; end
-        imgui.TextDisabled('Idle alerts are fully hidden. Turn preview on only to position the compact alert box.');
+        if toggle_button(imgui, 'Show Compact Placement Preview', config.ui.debuff_alert_preview, function(value) mutate(model, function(candidate) candidate.ui.debuff_alert_preview = value; end); window_initialized.debuff = false; end) then changed = true; end
+        imgui.TextDisabled('Uses a separate compact alert box. Your normal party panel stays visible; turn preview on only to position this alert box.');
     end
     if toggle_button(imgui, 'Enemy Dispel Compact Alert', config.ui.enemy_dispel_alert_mode, function(value) mutate(model, function(candidate) candidate.ui.enemy_dispel_alert_mode = value; candidate.ui.enemy_dispel_alert_preview = value; end); window_initialized.enemy = false; end) then changed = true; end
     if config.ui.enemy_dispel_alert_mode then
@@ -434,7 +434,7 @@ local function grid_layout_signature(config, groups)
     -- user drags the ImGui resize corner. Do not treat those live measurements
     -- as a layout change that reinitializes the window to its prior size.
     local width_signature = config.ui.adaptive_scale and 'live_resize' or tostring(config.ui.card_width);
-    return table.concat({tostring(config.ui.full_alliance_preview), tostring(config.ui.xiui_style), tostring(config.ui.debuff_alert_mode), tostring(config.ui.grid_columns), width_signature, table.concat(counts, ',')}, '|');
+    return table.concat({tostring(config.ui.full_alliance_preview), tostring(config.ui.xiui_style), tostring(config.ui.grid_columns), width_signature, table.concat(counts, ',')}, '|');
 end
 
 local function preview_member(slot)
@@ -470,11 +470,19 @@ local function visible_member_groups(members, config)
     for _, group in ipairs(groups) do lookup[group.id] = group; end
     for _, member in ipairs(members) do
         local group = lookup[member.alliance_group or 1];
-        if group and (not config.ui.debuff_alert_mode or member.remedy_recommendation ~= nil) then table.insert(group.members, member); end
+        if group then table.insert(group.members, member); end
     end
     local visible = {};
     for _, group in ipairs(groups) do if #group.members > 0 then table.insert(visible, group); end end
     return visible;
+end
+
+local function compact_debuff_members(members)
+    local result = {};
+    for _, member in ipairs(members or {}) do
+        if member.remedy_recommendation ~= nil then table.insert(result, member); end
+    end
+    return result;
 end
 
 local function render_xiui_member_card(imgui, model, member, now, config)
@@ -540,7 +548,6 @@ local function render_debuff_alert(imgui, model, member, now, config)
 end
 
 local function render_member_card(imgui, model, member, now, config)
-    if config.ui.debuff_alert_mode and not member.layout_preview then return render_debuff_alert(imgui, model, member, now, config); end
     if config.ui.xiui_style then return render_xiui_member_card(imgui, model, member, now, config); end
     local card_width = config.ui.card_width;
     local group_open = begin_group(imgui);
@@ -575,6 +582,31 @@ local function render_member_card(imgui, model, member, now, config)
         dummy(imgui, card_width, 16);
     end
     end_group(imgui, group_open);
+end
+
+local function render_compact_debuff_alert(imgui, model, now, config, members)
+    if config.ui.debuff_alert_mode ~= true then return false; end
+    local alerts = compact_debuff_members(members);
+    if #alerts == 0 and config.ui.debuff_alert_preview ~= true then return false; end
+
+    local changed = false;
+    local alpha = math.min(config.ui.background_alpha, 0.20);
+    set_window_alpha(imgui, alpha);
+    local background_pushed = push_window_background(imgui, alpha);
+    initialize_window(imgui, 'debuff', config.ui.debuff_alert_x, config.ui.debuff_alert_y, config.ui.card_width, 0);
+    local open = imgui.Begin('Debuff Alerts##partycare_debuff_alert', true, _G.ImGuiWindowFlags_NoTitleBar);
+    if open then
+        if not config.ui.locked then changed = capture_position(model, 'capture_debuff_alert_position', imgui) or changed; end
+        if #alerts == 0 then
+            -- An empty preview is shown only for deliberate placement.
+            dummy(imgui, config.ui.card_width, 18);
+        else
+            for _, member in ipairs(alerts) do render_debuff_alert(imgui, model, member, now, config); end
+        end
+    end
+    imgui.End();
+    if background_pushed then imgui.PopStyleColor(1); end
+    return changed;
 end
 
 local function render_enemy_dispel_alert(imgui, model, now, config, enemy)
@@ -622,14 +654,6 @@ function AshitaShell.render(model, now, callbacks)
     if not config.ui.visible then return {}, nil, false; end
 
     local groups = visible_member_groups(view.members, config);
-    local compact_idle = config.ui.debuff_alert_mode and #groups == 0;
-    if compact_idle and not config.ui.debuff_alert_preview then
-        -- Party compact mode stays hidden, but the independent enemy compact
-        -- panel can still appear for a log-confirmed battle enemy.
-        local enemy_changed = render_enemy_dispel_alert(imgui, model, now, config, view.enemy) or false;
-        local settings_changed = render_settings_window(imgui, model, callbacks) or false;
-        return model:drain_audit(), nil, enemy_changed or settings_changed;
-    end
     local layout_signature = grid_layout_signature(config, groups);
     if main_layout_signature ~= layout_signature then
         main_layout_signature = layout_signature;
@@ -639,7 +663,7 @@ function AshitaShell.render(model, now, callbacks)
     set_window_alpha(imgui, effective_alpha);
     local background_pushed = push_window_background(imgui, effective_alpha);
     initialize_window(imgui, 'main', config.ui.x, config.ui.y, grid_window_width(config, groups), config.ui.height);
-    local titlebar_flag = (config.ui.minimal_mode or config.ui.debuff_alert_mode) and _G.ImGuiWindowFlags_NoTitleBar or nil;
+    local titlebar_flag = config.ui.minimal_mode and _G.ImGuiWindowFlags_NoTitleBar or nil;
     local open;
     if titlebar_flag then open = imgui.Begin('PartyCare##grid', true, titlebar_flag); else open = imgui.Begin('PartyCare##grid'); end
     if open then
@@ -647,7 +671,7 @@ function AshitaShell.render(model, now, callbacks)
         changed = capture_size(model, imgui) or changed;
         view = model:view(); config = view.config;
         set_font_scale(imgui, config.ui.font_scale);
-        if not config.ui.minimal_mode and not config.ui.debuff_alert_mode then
+        if not config.ui.minimal_mode then
             if imgui.Button(config.ui.settings_open and 'Close Settings' or 'Settings', {-1, 0}) then
                 mutate(model, function(candidate) candidate.ui.settings_open = not candidate.ui.settings_open; end);
                 if not config.ui.settings_open then settings_tab = 'general'; end
@@ -659,10 +683,6 @@ function AshitaShell.render(model, now, callbacks)
         end
 
         groups = visible_member_groups(view.members, config);
-        if config.ui.debuff_alert_mode and #groups == 0 then
-            -- Preview remains content-free: it exists solely to reposition the hidden alert panel.
-            dummy(imgui, math.max(20, config.ui.card_width), 18);
-        end
         for group_index, group in ipairs(groups) do
             if #groups > 1 then
                 if group_index > 1 then imgui.Separator(); end
@@ -673,12 +693,13 @@ function AshitaShell.render(model, now, callbacks)
                 if not config.ui.xiui_style and index % config.ui.grid_columns ~= 0 and index < #group.members then imgui.SameLine(); end
             end
         end
-        if not config.ui.minimal_mode and not config.ui.debuff_alert_mode then imgui.TextDisabled('By: Schmeee'); end
+        if not config.ui.minimal_mode then imgui.TextDisabled('By: Schmeee'); end
 
     end
     imgui.End();
     if background_pushed then imgui.PopStyleColor(1); end
     view = model:view(); config = view.config;
+    changed = render_compact_debuff_alert(imgui, model, now, config, view.members) or changed;
     changed = render_enemy_dispel_alert(imgui, model, now, config, view.enemy) or changed;
     changed = render_settings_window(imgui, model, callbacks) or changed;
     return model:drain_audit(), nil, changed;

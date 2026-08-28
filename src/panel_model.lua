@@ -150,6 +150,18 @@ function PanelModel:capture_window_position(x, y)
     end);
 end
 
+function PanelModel:capture_debuff_alert_position(x, y)
+    if not Util.is_finite_number(x) or not Util.is_finite_number(y) then return false, {'debuff alert position must be finite'}; end
+    if self.config.ui.locked then return false, {}; end
+    if math.abs(self.config.ui.debuff_alert_x - x) < 1 and math.abs(self.config.ui.debuff_alert_y - y) < 1 then
+        return false, {};
+    end
+    return self:update_config(function(candidate)
+        candidate.ui.debuff_alert_x = x;
+        candidate.ui.debuff_alert_y = y;
+    end);
+end
+
 function PanelModel:capture_enemy_window_position(x, y)
     if not Util.is_finite_number(x) or not Util.is_finite_number(y) then return false, {'enemy window position must be finite'}; end
     if self.config.ui.locked then return false, {}; end
@@ -208,6 +220,8 @@ function PanelModel:reset_layout()
         candidate.ui.xiui_style = Config.DEFAULT.ui.xiui_style;
         candidate.ui.debuff_alert_mode = Config.DEFAULT.ui.debuff_alert_mode;
         candidate.ui.debuff_alert_preview = Config.DEFAULT.ui.debuff_alert_preview;
+        candidate.ui.debuff_alert_x = Config.DEFAULT.ui.debuff_alert_x;
+        candidate.ui.debuff_alert_y = Config.DEFAULT.ui.debuff_alert_y;
         candidate.ui.enemy_dispel_alert_mode = Config.DEFAULT.ui.enemy_dispel_alert_mode;
         candidate.ui.enemy_dispel_alert_preview = Config.DEFAULT.ui.enemy_dispel_alert_preview;
         candidate.ui.enemy_dispel_x = Config.DEFAULT.ui.enemy_dispel_x;

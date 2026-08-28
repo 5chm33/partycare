@@ -2,7 +2,7 @@
 -- Open /partycare config in game to customize bindings, layout, and remedy priorities.
 
 return {
-    version = 23,
+    version = 24,
     ui = {
         visible = true,
         locked = false,
@@ -23,8 +23,10 @@ return {
         adaptive_scale = true,
         font_scale = 1.00,
         xiui_style = false,
-        debuff_alert_mode = false, -- Show only members with an enabled remedy recommendation.
+        debuff_alert_mode = false, -- Show remedy alerts in a separate compact box while keeping the normal party panel visible.
         debuff_alert_preview = false, -- Show the otherwise hidden compact box only while positioning it.
+        debuff_alert_x = 320,
+        debuff_alert_y = 260,
         enemy_dispel_alert_mode = false, -- Manual Dispel button for the current party-engaged enemy, when Dispel is usable.
         enemy_dispel_alert_preview = false, -- Show the otherwise hidden enemy alert box only while positioning it.
         enemy_dispel_x = 320,
