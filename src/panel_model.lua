@@ -7,10 +7,87 @@ local Remedies = require('src.remedies');
 local PanelModel = {};
 PanelModel.__index = PanelModel;
 
+local function apply_refresh_continuity(members, previous_refresh, now, ui)
+    local next_refresh = {};
+    now = tonumber(now) or 0;
+    for _, member in ipairs(members or {}) do
+        local key = tostring(member.id);
+        local prior = previous_refresh and previous_refresh[key] or nil;
+        if member.refresh_known == true then
+            if member.has_refresh == true then
+                local applied_at = prior and prior.has_refresh == true and prior.applied_at or now;
+                local duration = ui and ui.refresh_duration_seconds or 150;
+                local lead = ui and ui.refresh_early_seconds or 15;
+                member.refresh_early = ui and ui.refresh_early_pulse_enabled == true
+                    and now >= (applied_at + duration - lead);
+                next_refresh[key] = {has_refresh = true, applied_at = applied_at};
+            else
+                next_refresh[key] = {has_refresh = false};
+            end
+        elseif prior and prior.has_refresh == false then
+            -- A transient unavailable feed must not clear an existing missing-
+            -- Refresh alert. It remains active until a later readable source
+            -- positively confirms the buff is present.
+            member.refresh_known = true;
+            member.has_refresh = false;
+            member.refresh_source = 'retained_missing_refresh';
+            next_refresh[key] = prior;
+        elseif prior and prior.has_refresh == true then
+            -- Keep the observed Refresh timer through a brief unavailable-feed
+            -- interval. A later readable absent state still overrides it.
+            member.refresh_known = true;
+            member.has_refresh = true;
+            local duration = ui and ui.refresh_duration_seconds or 150;
+            local lead = ui and ui.refresh_early_seconds or 15;
+            member.refresh_early = ui and ui.refresh_early_pulse_enabled == true
+                and now >= ((prior.applied_at or now) + duration - lead);
+            next_refresh[key] = prior;
+        end
+    end
+    return next_refresh;
+end
+
+local function apply_haste_continuity(members, previous_haste, now, ui)
+    local next_haste = {};
+    now = tonumber(now) or 0;
+    for _, member in ipairs(members or {}) do
+        local key = tostring(member.id);
+        local prior = previous_haste and previous_haste[key] or nil;
+        if member.haste_known == true then
+            if member.has_haste == true then
+                local applied_at = prior and prior.has_haste == true and prior.applied_at or now;
+                local duration = ui and ui.haste_duration_seconds or 180;
+                local lead = ui and ui.haste_early_seconds or 15;
+                member.haste_early = ui and ui.haste_early_pulse_enabled == true
+                    and now >= (applied_at + duration - lead);
+                next_haste[key] = {has_haste = true, applied_at = applied_at};
+            else
+                next_haste[key] = {has_haste = false};
+            end
+        elseif prior and prior.has_haste == false then
+            -- Preserve a confirmed missing Haste state through a short source
+            -- gap, just as Refresh does, until a readable active state clears it.
+            member.haste_known = true;
+            member.has_haste = false;
+            member.haste_source = 'retained_missing_haste';
+            next_haste[key] = prior;
+        elseif prior and prior.has_haste == true then
+            member.haste_known = true;
+            member.has_haste = true;
+            local duration = ui and ui.haste_duration_seconds or 180;
+            local lead = ui and ui.haste_early_seconds or 15;
+            member.haste_early = ui and ui.haste_early_pulse_enabled == true
+                and now >= ((prior.applied_at or now) + duration - lead);
+            next_haste[key] = prior;
+        end
+    end
+    return next_haste;
+end
+
 local function decorate_members(members, config)
-    local decorated = Party.decorate_members(members, config.thresholds);
+    local decorated = Party.decorate_members(members, config.thresholds, config.ui);
     for _, member in ipairs(decorated) do
-        local recommendation, candidates = Remedies.recommend(member, config.remedies);
+        local recommendation, candidates = Remedies.recommend(member, config.remedies, member.spell_availability);
         member.remedy_recommendation = recommendation;
         member.remedy_candidates = candidates;
         member.detected_remedies = Remedies.normalize_list(member);
@@ -25,6 +102,9 @@ function PanelModel.new(raw_config)
     local self = setmetatable({}, PanelModel);
     self.config = config;
     self.members = {};
+    self.enemy = nil;
+    self.refresh_by_member_id = {};
+    self.haste_by_member_id = {};
     self.intent_state = Intents.new();
     self.revision = 0;
     return self, {};
@@ -67,6 +147,30 @@ function PanelModel:capture_window_position(x, y)
     return self:update_config(function(candidate)
         candidate.ui.x = x;
         candidate.ui.y = y;
+    end);
+end
+
+function PanelModel:capture_debuff_alert_position(x, y)
+    if not Util.is_finite_number(x) or not Util.is_finite_number(y) then return false, {'debuff alert position must be finite'}; end
+    if self.config.ui.locked then return false, {}; end
+    if math.abs(self.config.ui.debuff_alert_x - x) < 1 and math.abs(self.config.ui.debuff_alert_y - y) < 1 then
+        return false, {};
+    end
+    return self:update_config(function(candidate)
+        candidate.ui.debuff_alert_x = x;
+        candidate.ui.debuff_alert_y = y;
+    end);
+end
+
+function PanelModel:capture_enemy_window_position(x, y)
+    if not Util.is_finite_number(x) or not Util.is_finite_number(y) then return false, {'enemy window position must be finite'}; end
+    if self.config.ui.locked then return false, {}; end
+    if math.abs(self.config.ui.enemy_dispel_x - x) < 1 and math.abs(self.config.ui.enemy_dispel_y - y) < 1 then
+        return false, {};
+    end
+    return self:update_config(function(candidate)
+        candidate.ui.enemy_dispel_x = x;
+        candidate.ui.enemy_dispel_y = y;
     end);
 end
 
@@ -113,18 +217,88 @@ function PanelModel:reset_layout()
         candidate.ui.minimal_mode = Config.DEFAULT.ui.minimal_mode;
         candidate.ui.adaptive_scale = Config.DEFAULT.ui.adaptive_scale;
         candidate.ui.font_scale = Config.DEFAULT.ui.font_scale;
+        candidate.ui.xiui_style = Config.DEFAULT.ui.xiui_style;
+        candidate.ui.debuff_alert_mode = Config.DEFAULT.ui.debuff_alert_mode;
+        candidate.ui.debuff_alert_preview = Config.DEFAULT.ui.debuff_alert_preview;
+        candidate.ui.debuff_alert_x = Config.DEFAULT.ui.debuff_alert_x;
+        candidate.ui.debuff_alert_y = Config.DEFAULT.ui.debuff_alert_y;
+        candidate.ui.enemy_dispel_alert_mode = Config.DEFAULT.ui.enemy_dispel_alert_mode;
+        candidate.ui.enemy_dispel_alert_preview = Config.DEFAULT.ui.enemy_dispel_alert_preview;
+        candidate.ui.enemy_dispel_x = Config.DEFAULT.ui.enemy_dispel_x;
+        candidate.ui.enemy_dispel_y = Config.DEFAULT.ui.enemy_dispel_y;
+        candidate.ui.refresh_pulse_enabled = Config.DEFAULT.ui.refresh_pulse_enabled;
+        candidate.ui.refresh_min_mp = Config.DEFAULT.ui.refresh_min_mp;
+        candidate.ui.refresh_early_pulse_enabled = Config.DEFAULT.ui.refresh_early_pulse_enabled;
+        candidate.ui.refresh_duration_seconds = Config.DEFAULT.ui.refresh_duration_seconds;
+        candidate.ui.refresh_early_seconds = Config.DEFAULT.ui.refresh_early_seconds;
+        candidate.ui.haste_pulse_enabled = Config.DEFAULT.ui.haste_pulse_enabled;
+        candidate.ui.haste_early_pulse_enabled = Config.DEFAULT.ui.haste_early_pulse_enabled;
+        candidate.ui.haste_duration_seconds = Config.DEFAULT.ui.haste_duration_seconds;
+        candidate.ui.haste_early_seconds = Config.DEFAULT.ui.haste_early_seconds;
         candidate.ui.show_action_bar = Config.DEFAULT.ui.show_action_bar;
         candidate.ui.show_remedy_button = Config.DEFAULT.ui.show_remedy_button;
     end);
 end
 
-function PanelModel:update_members(raw_members)
+function PanelModel:update_members(raw_members, now)
     local members, errors = Party.normalize_members(raw_members);
     if not members then return false, errors; end
+    self.refresh_by_member_id = apply_refresh_continuity(members, self.refresh_by_member_id, now, self.config.ui);
+    self.haste_by_member_id = apply_haste_continuity(members, self.haste_by_member_id, now, self.config.ui);
     self.members = decorate_members(members, self.config);
     if self.intent_state.selected_member_id ~= nil and not Party.find_member(self.members, self.intent_state.selected_member_id) then
         Intents.clear_selection(self.intent_state);
     end
+    self.revision = self.revision + 1;
+    return true, {};
+end
+
+function PanelModel:mark_refresh_reapplied(member_id, now)
+    if member_id == nil then return false, 'member id is required'; end
+    now = tonumber(now) or 0;
+    local key = tostring(member_id);
+    self.refresh_by_member_id[key] = {has_refresh = true, applied_at = now};
+    for _, member in ipairs(self.members or {}) do
+        if tostring(member.id) == key then
+            member.refresh_known = true;
+            member.has_refresh = true;
+            member.refresh_early = false;
+            member.refresh_source = 'observed_refresh_cast';
+        end
+    end
+    self.members = decorate_members(self.members, self.config);
+    self.revision = self.revision + 1;
+    return true, nil;
+end
+
+function PanelModel:mark_haste_reapplied(member_id, now)
+    if member_id == nil then return false, 'member id is required'; end
+    now = tonumber(now) or 0;
+    local key = tostring(member_id);
+    self.haste_by_member_id[key] = {has_haste = true, applied_at = now};
+    for _, member in ipairs(self.members or {}) do
+        if tostring(member.id) == key then
+            member.haste_known = true;
+            member.has_haste = true;
+            member.haste_early = false;
+            member.haste_source = 'observed_haste_cast';
+        end
+    end
+    self.members = decorate_members(self.members, self.config);
+    self.revision = self.revision + 1;
+    return true, nil;
+end
+
+function PanelModel:update_enemy(enemy)
+    if enemy == nil then
+        self.enemy = nil;
+        self.revision = self.revision + 1;
+        return true, {};
+    end
+    if type(enemy) ~= 'table' or enemy.id == nil or not Util.is_nonempty_string(enemy.name) then
+        return false, {'enemy must contain an id and name'};
+    end
+    self.enemy = Util.copy(enemy);
     self.revision = self.revision + 1;
     return true, {};
 end
@@ -181,11 +355,20 @@ function PanelModel:request_remedy(now)
     return intent, error_message;
 end
 
+function PanelModel:request_enemy_dispel(now)
+    if self.config.ui.enemy_dispel_alert_mode ~= true then return nil, 'enemy Dispel alert mode is disabled'; end
+    local enemy = self.enemy;
+    if type(enemy) ~= 'table' or enemy.action_available ~= true then return nil, 'no actionable enemy target'; end
+    local action = {label = 'Dispel', spell = enemy.spell or 'Dispel', enabled = true};
+    return Intents.request_current_target(self.intent_state, 'enemy_dispel', action, enemy, now, self.config.review.review_click_cast_enabled);
+end
+
 function PanelModel:view()
     return {
         revision = self.revision,
         config = Util.copy(self.config),
         members = Util.copy(self.members),
+        enemy = Util.copy(self.enemy),
         selected_member_id = self.intent_state.selected_member_id,
     };
 end

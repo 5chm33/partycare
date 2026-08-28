@@ -42,13 +42,15 @@ function Remedies.normalize_list(member)
     return output;
 end
 
-function Remedies.recommend(member, rules)
+function Remedies.recommend(member, rules, spell_availability)
     if type(rules) ~= 'table' then return nil, {}; end
     local candidates = {};
     for _, debuff in ipairs(Remedies.normalize_list(member)) do
         local rule = rules[debuff];
-        if type(rule) == 'table' and rule.enabled and Util.is_nonempty_string(rule.spell) and Util.is_integer(rule.priority) then
-            table.insert(candidates, {rule_id = debuff, debuff = debuff, spell = rule.spell, priority = rule.priority});
+        local known = nil;
+        if type(rule) == 'table' and type(spell_availability) == 'table' then known = spell_availability[rule.spell]; end
+        if type(rule) == 'table' and rule.enabled and Util.is_nonempty_string(rule.spell) and Util.is_integer(rule.priority) and known ~= false then
+            table.insert(candidates, {rule_id = debuff, debuff = debuff, spell = rule.spell, priority = rule.priority, spell_known = known});
         end
     end
     table.sort(candidates, function(left, right)

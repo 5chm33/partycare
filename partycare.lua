@@ -1,6 +1,6 @@
 addon.name = 'partycare';
 addon.author = 'Schmeee';
-addon.version = '1.2.3';
+addon.version = '1.2.30-xiui';
 addon.desc = 'Manual party and alliance healing and remedy panel for Ashita.';
 
 local Config = require('src.config');
@@ -8,6 +8,11 @@ local PanelModel = require('src.panel_model');
 local AshitaShell = require('src.ashita_shell');
 local SettingsStore = require('src.settings_store');
 local PartyProvider = require('src.ashita_party_provider');
+local PartyStatusCache = require('src.party_status_cache');
+local BattleEnemyTracker = require('src.battle_enemy_tracker');
+local RefreshCastTracker = require('src.refresh_cast_tracker');
+local EnemyLogTracker = require('src.enemy_log_tracker');
+local Timebase = require('src.timebase');
 local ManualDispatchAdapter = require('src.manual_dispatch_adapter');
 local Commands = require('src.commands');
 
@@ -20,6 +25,7 @@ local state = {
     last_render_error = nil,
     last_party_error = nil,
     dispatch_adapter = nil,
+    timebase = Timebase.new(),
 };
 
 local function chat(message)
@@ -52,15 +58,19 @@ end
 local function mark_dirty() state.dirty_at = state.now; end
 
 local function update_members()
-    local members, provider_error = PartyProvider.snapshot();
+    local current = state.model and state.model:view();
+    local members, provider_error = PartyProvider.snapshot(current and current.config.remedies or nil);
     if not members then
         state.model:update_members({});
         if state.last_party_error ~= provider_error then state.last_party_error = provider_error; chat('Party data unavailable: ' .. tostring(provider_error)); end
         return;
     end
     state.last_party_error = nil;
-    local updated, errors = state.model:update_members(members);
+    local updated, errors = state.model:update_members(members, state.now);
     if not updated then chat('Party data was rejected: ' .. table.concat(errors, '; ')); end
+    local enemy = BattleEnemyTracker.current();
+    local enemy_updated, enemy_errors = state.model:update_enemy(enemy);
+    if not enemy_updated then chat('Enemy target data was rejected: ' .. table.concat(enemy_errors or {}, '; ')); end
 end
 
 local function show_panel(open_settings)
@@ -80,6 +90,24 @@ local function set_dispatch(enabled)
     chat(enabled and 'Manual actions enabled.' or 'Manual actions disabled.');
 end
 
+local function apply_xiui_preset()
+    local updated, errors = state.model:update_config(function(candidate)
+        candidate.ui.xiui_style = true;
+        candidate.ui.grid_columns = 1;
+        candidate.ui.card_width = 260;
+        candidate.ui.card_height = 60;
+        candidate.ui.background_alpha = 0.08;
+        candidate.ui.minimal_mode = true;
+        candidate.ui.show_mp = true;
+        candidate.ui.show_status = true;
+        candidate.ui.show_remedy_button = true;
+    end);
+    if not updated then chat('Unable to apply XIUI preset: ' .. table.concat(errors, '; ')); return; end
+    AshitaShell.reset_window_positions();
+    mark_dirty();
+    chat('XIUI-compatible PartyCare preset applied. Disable XIUI Party List to avoid duplicate party panels.');
+end
+
 local function handle_command(parsed)
     if type(parsed) ~= 'table' then return false; end
     local action = parsed.action;
@@ -91,11 +119,13 @@ local function handle_command(parsed)
     elseif action == 'save' then if save_settings() then chat('Settings saved.'); end
     elseif action == 'dispatch' then
         if parsed.argument == 'on' then set_dispatch(true) elseif parsed.argument == 'off' then set_dispatch(false) else chat('Usage: /partycare dispatch on|off'); end
+    elseif action == 'xiui' then
+        apply_xiui_preset();
     elseif action == 'status' then
         local view = state.model:view();
         chat(string.format('Panel: %s; members: %d; direct click: %s; actions: %s', tostring(view.config.ui.visible), #view.members, tostring(view.config.direct_click.enabled), tostring(view.config.live_test.manual_dispatch_enabled and not view.config.live_test.emergency_stop)));
     else
-        chat('Commands: /partycare show|hide|toggle|config|reset|save|dispatch on|dispatch off|status');
+        chat('Commands: /partycare show|hide|toggle|config|xiui|reset|save|dispatch on|dispatch off|status');
     end
     return true;
 end
@@ -117,6 +147,33 @@ ashita.events.register('load', 'partycare_load', function()
     chat('Loaded. Use /pc to open settings.');
 end);
 
+ashita.events.register('packet_in', 'partycare_packet_in', function(e)
+    if not e then return; end
+    if e.id == 0x076 then
+        PartyStatusCache.update(e);
+    elseif e.id == 0x0028 then
+        BattleEnemyTracker.handle_action_packet(e);
+        RefreshCastTracker.handle_packet(e, BattleEnemyTracker.party_ids(), state.now, function(kind, member_id, applied_at)
+            if not state.model then return; end
+            if kind == 'haste' then
+                state.model:mark_haste_reapplied(member_id, applied_at);
+            elseif kind == 'refresh' then
+                state.model:mark_refresh_reapplied(member_id, applied_at);
+            end
+        end);
+    elseif e.id == 0x00E then
+        BattleEnemyTracker.handle_mob_update_packet(e);
+    elseif e.id == 0x00A or e.id == 0x00B then
+        PartyStatusCache.clear();
+        BattleEnemyTracker.clear();
+        RefreshCastTracker.clear();
+    end
+end);
+
+ashita.events.register('text_in', 'partycare_enemy_log', function(e)
+    EnemyLogTracker.handle_text(e);
+end);
+
 ashita.events.register('command', 'partycare_command', function(e)
     local parsed = Commands.parse(e and e.command);
     if not parsed then return; end
@@ -126,7 +183,9 @@ end);
 
 ashita.events.register('d3d_present', 'partycare_draw', function()
     if not state.model then return; end
-    state.now = state.now + (1 / 60);
+    local elapsed, current_time = state.timebase:step();
+    state.now = current_time;
+    BattleEnemyTracker.update(elapsed);
     if state.now >= state.next_snapshot_at then state.next_snapshot_at = state.now + 0.20; update_members(); end
     local ok, audit, error_message, changed = pcall(AshitaShell.render, state.model, state.now, {on_save = function() return save_settings(); end});
     if not ok then

@@ -1,7 +1,7 @@
 local Util = require('src.util');
 
 local Config = {};
-Config.VERSION = 16;
+Config.VERSION = 24;
 
 Config.DEFAULT = {
     version = Config.VERSION,
@@ -11,7 +11,12 @@ Config.DEFAULT = {
         width = 420, height = 0, member_height = 24,
         layout = 'grid', grid_columns = 2, card_width = 200, card_height = 74,
         background_alpha = 0.28,
-        minimal_mode = true, adaptive_scale = true, font_scale = 1.00,
+        minimal_mode = true, adaptive_scale = true, font_scale = 1.00, xiui_style = false,
+        debuff_alert_mode = false, debuff_alert_preview = false, debuff_alert_x = 320, debuff_alert_y = 260,
+        enemy_dispel_alert_mode = false, enemy_dispel_alert_preview = false, enemy_dispel_x = 320, enemy_dispel_y = 180,
+        refresh_pulse_enabled = false, refresh_min_mp = 150,
+        refresh_early_pulse_enabled = true, refresh_duration_seconds = 150, refresh_early_seconds = 15,
+        haste_pulse_enabled = false, haste_early_pulse_enabled = true, haste_duration_seconds = 180, haste_early_seconds = 15,
         show_mp = true, show_status = true, show_action_bar = false, show_remedy_button = true,
         show_alliance_2 = false, show_alliance_3 = false, full_alliance_preview = false,
     },
@@ -55,8 +60,8 @@ Config.DEFAULT = {
         middle = {spell = 'Cure V', enabled = false},
         mouse4 = {spell = 'Cure III', enabled = false},
         mouse5 = {spell = 'Cure V', enabled = false},
-        wheel_up = {spell = 'Regen', enabled = false},
-        wheel_down = {spell = 'Cure III', enabled = false},
+        wheel_up = {spell = 'Refresh', enabled = true},
+        wheel_down = {spell = 'Haste', enabled = true},
     },
     colors = {
         healthy = {0.15, 0.70, 0.35, 1.00}, warning = {0.92, 0.63, 0.12, 1.00},
@@ -68,8 +73,9 @@ local ROOT_FIELDS = {version = true, ui = true, thresholds = true, actions = tru
 local UI_FIELDS = {
     visible = true, locked = true, settings_open = true, x = true, y = true, settings_x = true, settings_y = true,
     width = true, height = true, member_height = true, layout = true, grid_columns = true, card_width = true, card_height = true,
-    background_alpha = true, minimal_mode = true, adaptive_scale = true, font_scale = true,
-    show_mp = true, show_status = true, show_action_bar = true, show_remedy_button = true,
+        background_alpha = true, minimal_mode = true, adaptive_scale = true, font_scale = true, xiui_style = true,
+        debuff_alert_mode = true, debuff_alert_preview = true, debuff_alert_x = true, debuff_alert_y = true, enemy_dispel_alert_mode = true, enemy_dispel_alert_preview = true, enemy_dispel_x = true, enemy_dispel_y = true, refresh_pulse_enabled = true, refresh_min_mp = true, refresh_early_pulse_enabled = true, refresh_duration_seconds = true, refresh_early_seconds = true, haste_pulse_enabled = true, haste_early_pulse_enabled = true, haste_duration_seconds = true, haste_early_seconds = true,
+        show_mp = true, show_status = true, show_action_bar = true, show_remedy_button = true,
     show_alliance_2 = true, show_alliance_3 = true, full_alliance_preview = true,
 };
 local THRESHOLD_FIELDS = {warning_hp = true, critical_hp = true};
@@ -95,7 +101,7 @@ local function migrate(raw)
         local previous_version = raw.version;
         raw.version = Config.VERSION;
         raw.ui, raw.actions, raw.remedies, raw.review, raw.live_test, raw.direct_click = raw.ui or {}, raw.actions or {}, raw.remedies or {}, raw.review or {}, raw.live_test or {}, raw.direct_click or {};
-        for _, key in ipairs({'height', 'settings_open', 'settings_x', 'settings_y', 'layout', 'grid_columns', 'card_width', 'card_height', 'background_alpha', 'minimal_mode', 'adaptive_scale', 'font_scale', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
+        for _, key in ipairs({'height', 'settings_open', 'settings_x', 'settings_y', 'layout', 'grid_columns', 'card_width', 'card_height', 'background_alpha', 'minimal_mode', 'adaptive_scale', 'font_scale', 'xiui_style', 'debuff_alert_mode', 'debuff_alert_preview', 'debuff_alert_x', 'debuff_alert_y', 'enemy_dispel_alert_mode', 'enemy_dispel_alert_preview', 'enemy_dispel_x', 'enemy_dispel_y', 'refresh_pulse_enabled', 'refresh_min_mp', 'refresh_early_pulse_enabled', 'refresh_duration_seconds', 'refresh_early_seconds', 'haste_pulse_enabled', 'haste_early_pulse_enabled', 'haste_duration_seconds', 'haste_early_seconds', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
             if raw.ui[key] == nil then raw.ui[key] = Config.DEFAULT.ui[key]; end
         end
         for key, default_action in pairs(Config.DEFAULT.actions) do
@@ -145,6 +151,51 @@ local function migrate(raw)
         if previous_version < 16 then
             -- Layout can use up to six columns; existing transparency is preserved until the user changes it.
         end
+        if previous_version < 17 then
+            -- The XIUI-compatible skin is opt-in so existing PartyCare layouts remain unchanged.
+            raw.ui.xiui_style = false;
+        end
+        if previous_version < 18 then
+            -- New alert modes are opt-in and use the user's requested 150 MP threshold.
+            raw.ui.debuff_alert_mode = false;
+            raw.ui.refresh_pulse_enabled = false;
+            raw.ui.refresh_min_mp = 150;
+        end
+        if previous_version < 19 then
+            -- Compact alerts are invisible when idle; placement preview remains opt-in.
+            raw.ui.debuff_alert_preview = false;
+        end
+        if previous_version < 20 then
+            -- The enemy Dispel panel is opt-in and uses its own saved position.
+            raw.ui.enemy_dispel_alert_mode = false;
+            raw.ui.enemy_dispel_alert_preview = false;
+            raw.ui.enemy_dispel_x = Config.DEFAULT.ui.enemy_dispel_x;
+            raw.ui.enemy_dispel_y = Config.DEFAULT.ui.enemy_dispel_y;
+        end
+        if previous_version < 21 then
+            -- Early Refresh cues use the observed start time plus configurable
+            -- assumed duration; missing-Refresh alerts remain the fallback.
+            raw.ui.refresh_early_pulse_enabled = Config.DEFAULT.ui.refresh_early_pulse_enabled;
+            raw.ui.refresh_duration_seconds = Config.DEFAULT.ui.refresh_duration_seconds;
+            raw.ui.refresh_early_seconds = Config.DEFAULT.ui.refresh_early_seconds;
+        end
+        if previous_version < 22 then
+            -- Haste upkeep alerts are independent, opt-in, and default off.
+            raw.ui.haste_pulse_enabled = Config.DEFAULT.ui.haste_pulse_enabled;
+            raw.ui.haste_early_pulse_enabled = Config.DEFAULT.ui.haste_early_pulse_enabled;
+            raw.ui.haste_duration_seconds = Config.DEFAULT.ui.haste_duration_seconds;
+            raw.ui.haste_early_seconds = Config.DEFAULT.ui.haste_early_seconds;
+        end
+        if previous_version < 23 then
+            -- Wheel bindings now provide the requested RDM upkeep defaults.
+            raw.direct_click.wheel_up = Util.copy(Config.DEFAULT.direct_click.wheel_up);
+            raw.direct_click.wheel_down = Util.copy(Config.DEFAULT.direct_click.wheel_down);
+        end
+        if previous_version < 24 then
+            -- Compact debuff alerts now use an independent secondary window.
+            raw.ui.debuff_alert_x = Config.DEFAULT.ui.debuff_alert_x;
+            raw.ui.debuff_alert_y = Config.DEFAULT.ui.debuff_alert_y;
+        end
         for key, default_binding in pairs(Config.DEFAULT.direct_click) do
             if key ~= 'enabled' then raw.direct_click[key] = raw.direct_click[key] or Util.copy(default_binding); end
         end
@@ -187,10 +238,10 @@ function Config.validate(raw)
     unknown_fields(raw, ROOT_FIELDS, 'configuration', errors);
     if type(raw.ui) ~= 'table' then table.insert(errors, 'ui must be a table'); else
         unknown_fields(raw.ui, UI_FIELDS, 'ui', errors);
-        for _, key in ipairs({'visible', 'locked', 'settings_open', 'minimal_mode', 'adaptive_scale', 'show_mp', 'show_status', 'show_action_bar', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
+        for _, key in ipairs({'visible', 'locked', 'settings_open', 'minimal_mode', 'adaptive_scale', 'xiui_style', 'debuff_alert_mode', 'debuff_alert_preview', 'enemy_dispel_alert_mode', 'enemy_dispel_alert_preview', 'refresh_pulse_enabled', 'refresh_early_pulse_enabled', 'haste_pulse_enabled', 'haste_early_pulse_enabled', 'show_mp', 'show_status', 'show_action_bar', 'show_remedy_button', 'show_alliance_2', 'show_alliance_3', 'full_alliance_preview'}) do
             if type(raw.ui[key]) == 'boolean' then result.ui[key] = raw.ui[key] else table.insert(errors, 'ui.' .. key .. ' must be boolean'); end
         end
-        for _, key in ipairs({'x', 'y', 'settings_x', 'settings_y'}) do
+        for _, key in ipairs({'x', 'y', 'settings_x', 'settings_y', 'debuff_alert_x', 'debuff_alert_y', 'enemy_dispel_x', 'enemy_dispel_y'}) do
             if Util.is_finite_number(raw.ui[key]) then result.ui[key] = raw.ui[key] else table.insert(errors, 'ui.' .. key .. ' must be finite'); end
         end
         for _, key in ipairs({'width', 'member_height', 'card_width', 'card_height'}) do
@@ -201,6 +252,11 @@ function Config.validate(raw)
         if not Util.is_integer(raw.ui.grid_columns) or raw.ui.grid_columns < 1 or raw.ui.grid_columns > 6 then table.insert(errors, 'ui.grid_columns must be an integer from 1 to 6'); else result.ui.grid_columns = raw.ui.grid_columns; end
         if not Util.is_finite_number(raw.ui.background_alpha) or raw.ui.background_alpha < 0.05 or raw.ui.background_alpha > 0.90 then table.insert(errors, 'ui.background_alpha must be between 0.05 and 0.90'); else result.ui.background_alpha = raw.ui.background_alpha; end
         if not Util.is_finite_number(raw.ui.font_scale) or raw.ui.font_scale < 0.60 or raw.ui.font_scale > 1.80 then table.insert(errors, 'ui.font_scale must be between 0.60 and 1.80'); else result.ui.font_scale = raw.ui.font_scale; end
+        if not Util.is_integer(raw.ui.refresh_min_mp) or raw.ui.refresh_min_mp < 0 or raw.ui.refresh_min_mp > 9999 then table.insert(errors, 'ui.refresh_min_mp must be an integer from 0 to 9999'); else result.ui.refresh_min_mp = raw.ui.refresh_min_mp; end
+        if not Util.is_integer(raw.ui.refresh_duration_seconds) or raw.ui.refresh_duration_seconds < 30 or raw.ui.refresh_duration_seconds > 900 then table.insert(errors, 'ui.refresh_duration_seconds must be an integer from 30 to 900'); else result.ui.refresh_duration_seconds = raw.ui.refresh_duration_seconds; end
+        if not Util.is_integer(raw.ui.refresh_early_seconds) or raw.ui.refresh_early_seconds < 1 or raw.ui.refresh_early_seconds >= raw.ui.refresh_duration_seconds then table.insert(errors, 'ui.refresh_early_seconds must be an integer below the Refresh duration'); else result.ui.refresh_early_seconds = raw.ui.refresh_early_seconds; end
+        if not Util.is_integer(raw.ui.haste_duration_seconds) or raw.ui.haste_duration_seconds < 30 or raw.ui.haste_duration_seconds > 900 then table.insert(errors, 'ui.haste_duration_seconds must be an integer from 30 to 900'); else result.ui.haste_duration_seconds = raw.ui.haste_duration_seconds; end
+        if not Util.is_integer(raw.ui.haste_early_seconds) or raw.ui.haste_early_seconds < 1 or raw.ui.haste_early_seconds >= raw.ui.haste_duration_seconds then table.insert(errors, 'ui.haste_early_seconds must be an integer below the Haste duration'); else result.ui.haste_early_seconds = raw.ui.haste_early_seconds; end
     end
 
     if type(raw.thresholds) ~= 'table' then table.insert(errors, 'thresholds must be a table'); else

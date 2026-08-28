@@ -48,6 +48,35 @@ function Intents.request(state, action_key, action, member, now, review_enabled)
     return intent, nil;
 end
 
+function Intents.request_current_target(state, action_key, action, enemy, now, review_enabled)
+    assert(type(state) == 'table', 'intent state is required');
+    if not Util.is_nonempty_string(action_key) then return nil, 'action key is required'; end
+    if type(action) ~= 'table' or not Util.is_nonempty_string(action.label) or not Util.is_nonempty_string(action.spell) then
+        return nil, 'validated action binding is required';
+    end
+    if type(enemy) ~= 'table' or enemy.id == nil or not Util.is_nonempty_string(enemy.name) then
+        return nil, 'valid enemy target is required';
+    end
+    if not Util.is_finite_number(now) or now < 0 then return nil, 'non-negative timestamp is required'; end
+
+    state.sequence = state.sequence + 1;
+    local intent = {
+        kind = Intents.KIND,
+        sequence = state.sequence,
+        at = now,
+        action_key = action_key,
+        action_label = action.label,
+        spell = action.spell,
+        member_id = enemy.id,
+        member_name = enemy.name,
+        target_kind = 'current_target',
+        target_index = enemy.target_index,
+        review_click_cast_enabled = review_enabled == true,
+    };
+    table.insert(state.audit, Util.copy(intent));
+    return intent, nil;
+end
+
 function Intents.drain_audit(state)
     assert(type(state) == 'table', 'intent state is required');
     local audit = Util.copy(state.audit);

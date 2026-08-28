@@ -38,6 +38,20 @@ function Party.normalize_member(raw, position)
         end
     end
 
+    local debuff_labels = {};
+    if type(raw.debuff_labels) == 'table' then
+        for rule_id, label in pairs(raw.debuff_labels) do
+            if Util.is_nonempty_string(rule_id) and Util.is_nonempty_string(label) then debuff_labels[rule_id] = label; end
+        end
+    end
+
+    local spell_availability = {};
+    if type(raw.spell_availability) == 'table' then
+        for spell, known in pairs(raw.spell_availability) do
+            if Util.is_nonempty_string(spell) and type(known) == 'boolean' then spell_availability[spell] = known; end
+        end
+    end
+
     local normalized = {
         id = raw.id,
         name = raw.name,
@@ -51,9 +65,17 @@ function Party.normalize_member(raw, position)
         active = raw.active ~= false,
         status = type(raw.status) == 'string' and raw.status or '',
         debuffs = debuffs,
+        debuff_labels = debuff_labels,
         status_feed_available = raw.status_feed_available == true,
         status_icon_count = Util.is_integer(raw.status_icon_count) and math.max(0, raw.status_icon_count) or 0,
         status_source = type(raw.status_source) == 'string' and raw.status_source or '',
+        has_refresh = raw.has_refresh == true,
+        refresh_known = raw.refresh_known == true,
+        refresh_early = raw.refresh_early == true,
+        has_haste = raw.has_haste == true,
+        haste_known = raw.haste_known == true,
+        haste_early = raw.haste_early == true,
+        spell_availability = spell_availability,
     };
     normalized.hp_percent = normalized.hp / normalized.hp_max * 100;
     normalized.mp_percent = normalized.mp_max == 0 and 0 or normalized.mp / normalized.mp_max * 100;
@@ -90,12 +112,37 @@ function Party.severity(member, thresholds)
     return 'healthy';
 end
 
-function Party.decorate_members(members, thresholds)
+function Party.decorate_members(members, thresholds, ui)
     local decorated = {};
     for index, member in ipairs(members) do
         decorated[index] = Util.copy(member);
         decorated[index].severity = Party.severity(member, thresholds);
         decorated[index].needs_attention = decorated[index].severity == 'warning' or decorated[index].severity == 'critical';
+        local alertable = decorated[index].active and decorated[index].hp > 0;
+        local above_refresh_threshold = decorated[index].mp_max > (ui and ui.refresh_min_mp or 150);
+        local confirmed_missing = decorated[index].refresh_known == true and decorated[index].has_refresh ~= true;
+        local early_refresh = decorated[index].refresh_early == true;
+        local refresh_feature_enabled = ui and ui.refresh_pulse_enabled == true;
+        decorated[index].refresh_missing = alertable and refresh_feature_enabled
+            and above_refresh_threshold
+            and (confirmed_missing or early_refresh);
+        decorated[index].refresh_alert_kind = alertable and refresh_feature_enabled and above_refresh_threshold
+            and (confirmed_missing and 'missing' or (early_refresh and 'expiring' or nil))
+            or nil;
+
+        -- Haste is a separate, explicitly opt-in party upkeep cue. HorizonXI
+        -- does not reliably expose remote Haste or the local spellbook during
+        -- every update, so this display reminder must not silently disappear
+        -- because either source is temporarily absent. The actual wheel-down
+        -- Haste command remains learned-and-level-usable gated before casting.
+        -- Refresh retains visual priority whenever both cues would apply.
+        local haste_feature_enabled = ui and ui.haste_pulse_enabled == true;
+        local haste_missing_or_unknown = decorated[index].has_haste ~= true;
+        local early_haste = decorated[index].haste_early == true;
+        decorated[index].haste_alert_kind = alertable and haste_feature_enabled
+            and (haste_missing_or_unknown and 'haste_missing' or (early_haste and 'haste_expiring' or nil))
+            or nil;
+        decorated[index].upkeep_alert_kind = decorated[index].refresh_alert_kind or decorated[index].haste_alert_kind;
     end
     return decorated;
 end
