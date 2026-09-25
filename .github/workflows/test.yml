@@ -1,0 +1,17 @@
+name: Syntax and offline tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua
+        run: sudo apt-get update && sudo apt-get install --yes lua5.4
+      - name: Run syntax and offline tests
+        run: ./scripts/test.sh
