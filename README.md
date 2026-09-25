@@ -50,6 +50,12 @@ Alliance member HP/MP data is available through Ashita’s party interface. Part
 
 Each party member appears as a compact card with name, unclipped HP/MP percentage bars, and a card-level **Remedy** button when PartyCare recognizes an enabled removable status. The Remedy button receives a subtle amber pulse but remains independent of direct clicks: one explicit Remedy click resolves only the highest-priority recognized status for that member. **Minimal Live Frame** is on by default, leaving only the transparent party cards during play; use `/partycare` or `/pc` whenever you want to open Settings. The Settings window includes a top-right **X** as well as its labeled Close controls. **Adaptive Card Scaling** adjusts card and text scale as you resize the panel. Choose one through six grid columns for portrait or landscape layouts; **Full Alliance Layout Preview** displays eighteen inert cards for arranging the grid, then the main panel contracts to the active live-party footprint when preview is disabled. The opacity control accepts 5%–90% and applies an explicit transparent background style. See [UI_GUIDE.md](UI_GUIDE.md) for the complete card-layout reference.
 
+## Safety boundary: manual dispatch
+
+**Important:** PartyCare can queue an Ashita command in the game client. A configured direct-click or Remedy action creates a `MANUAL_CLICK_CAST_REQUEST`; when `live_test.manual_dispatch_enabled` is `true`, `emergency_stop` is `false`, and Ashita provides a chat manager, `src/manual_dispatch_adapter.lua` queues `/ma "Spell" <target>` with `QueueCommand(1, command)`. This is a single explicit manual action, not an autonomous healing loop, but it is an external client action and must be treated as a live cast request.
+
+Dispatch is gated off by the emergency-stop state and can be disabled immediately with `/partycare dispatch off`. The offline tests use only a synthetic chat manager and never connect to Ashita or cast in-game.
+
 ## Direct Clicks
 
 When Direct Click Mode is enabled, each active party-card input uses its configured spell. The default left-click binding is Cure IV; edit any spell name or input binding in **Direct Click**. Alongside left, right, and middle click, PartyCare supports **Mouse 4**, **Mouse 5**, **Wheel Up**, and **Wheel Down** when the Ashita ImGui runtime exposes that input. Wheel bindings require the cursor to be directly over the intended card and are limited to one manual action per deliberate scroll input.
